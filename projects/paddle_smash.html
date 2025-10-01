@@ -137,7 +137,14 @@ document.addEventListener("keydown", e=>{
 });
 document.addEventListener("keyup", e=>{ if(e.key==="ArrowLeft"||e.key==="ArrowRight") paddle.speed=0; });
 
-function launchBall(){ if(!ball.released && !gameOver){ ball.released=true; ball.dx=baseSpeed; ball.dy=-baseSpeed; if(!startTime) startTime=Date.now(); }}
+function launchBall(){ 
+	if(!ball.released && !gameOver){ 
+		ball.released=true; 
+		ball.dx=baseSpeed; 
+		ball.dy=-baseSpeed; 
+		if(!startTime) startTime=Date.now(); 
+	}
+}
 
 function playSound(sound){ sound.currentTime=0; sound.play(); }
 
