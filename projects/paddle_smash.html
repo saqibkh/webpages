@@ -117,7 +117,7 @@ window.addEventListener('resize',resizeCanvas); resizeCanvas(); levelOverlay.sty
 
 function startGame(){ 
   level=parseInt(levelSelect.value); 
-  paddle.width=100*Math.pow(0.98,level-1); 
+  paddle.width=200*Math.pow(0.98,level-1); 
   paddle.x=canvas.width/2-paddle.width/2; 
   levelOverlay.style.display="none"; 
   gameOver=false; gameWon=false; score=0; startTime=null; 
