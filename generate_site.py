@@ -54,6 +54,9 @@ def main():
 
     # Generate individual project pages
     for proj in projects:
+        if proj.get("type") == "calculator":
+            print(f"Skipped generating page for {proj['name']} (manual file in place)")
+            continue
         filename = proj['name'].lower().replace(" ", "_") + ".html"
         write_file(f"projects/{filename}", generate_project_page(proj))
         print(f"Generated projects/{filename}")

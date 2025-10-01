@@ -1,5 +1,12 @@
 projects = [
     {
+      "name": "Calculator",
+      "description": "A simple interactive calculator built with HTML, CSS, and JavaScript.",
+      "link": "projects/calculator.html",
+      "details": "An in-browser calculator to perform basic arithmetic operations.",
+      "type": "calculator"
+    },
+    {
         "name": "Intelligence-Lab Youtube Channel",
         "description": "My personal YouTube channel where I post tech-related content.",
         "link": "https://www.youtube.com/@Intelligence_Lab_SK",
