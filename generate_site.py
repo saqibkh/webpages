@@ -54,7 +54,7 @@ def main():
 
     # Generate individual project pages
     for proj in projects:
-        if proj.get("type") == "calculator":
+        if proj.get("type") == "application":
             print(f"Skipped generating page for {proj['name']} (manual file in place)")
             continue
         filename = proj['name'].lower().replace(" ", "_") + ".html"

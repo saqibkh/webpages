@@ -1,10 +1,21 @@
 projects = [
     {
+      "name": "Paddle Smash",
+      "description": "A visually enhanced block-breaking game with multiple levels, paddle control, and real-time scoring.",
+      "link": "projects/paddle_smash.html",
+      "details": (
+            "Paddle Smash allows users to select levels from 1 to 10, with increasing ball speed and decreasing paddle size. "
+            "The game features gradient-colored blocks, particle effects, ball trails, pause/resume functionality, and keyboard/mouse controls. "
+            "Top 10 scores are tracked per level with time-based ranking. Sound effects play on paddle and block hits for immersive gameplay."
+        ),
+      "type": "application"
+    },
+    {
       "name": "Calculator",
       "description": "A simple interactive calculator built with HTML, CSS, and JavaScript.",
       "link": "projects/calculator.html",
       "details": "An in-browser calculator to perform basic arithmetic operations.",
-      "type": "calculator"
+      "type": "application"
     },
     {
         "name": "Intelligence-Lab Youtube Channel",
