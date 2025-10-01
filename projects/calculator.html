@@ -1,154 +1,211 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Calculator</title>
-  <link rel="stylesheet" href="../assets/css/styles.css">
-  <style>
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: linear-gradient(135deg, #4CAF50, #81C784);
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
-    .calculator {
-      background: #fff;
-      border-radius: 16px;
-      padding: 20px;
-      width: 300px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-    }
-
-    .calculator h1 {
-      text-align: center;
-      margin-bottom: 20px;
-      font-size: 1.5em;
-      color: #333;
-    }
-
-    .display {
-      width: 100%;
-      height: 60px;
-      margin-bottom: 20px;
-      font-size: 24px;
-      text-align: right;
-      padding: 10px;
-      border: none;
-      border-radius: 8px;
-      background: #f3f3f3;
-      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    .buttons {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-    }
-
-    .buttons button {
-      height: 60px;
-      font-size: 20px;
-      border: none;
-      border-radius: 8px;
-      background: #e0e0e0;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-    }
-
-    .buttons button:hover {
-      background: #d5d5d5;
-    }
-
-    .buttons button:active {
-      transform: scale(0.95);
-    }
-
-    .buttons .equal {
-      background: #4CAF50;
-      color: white;
-      font-weight: bold;
-    }
-
-    .buttons .equal:hover {
-      background: #43a047;
-    }
-
-    .buttons .clear {
-      background: #f44336;
-      color: white;
-      font-weight: bold;
-    }
-
-    .buttons .clear:hover {
-      background: #e53935;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Calculator</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #4CAF50, #81C784);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 40px 0;
+  }
+  .calculator {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    width: 340px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  }
+  h1 { text-align: center; margin-bottom: 20px; font-size: 1.5em; color: #333; }
+  .display {
+    width: 100%;
+    height: 60px;
+    margin-bottom: 10px;
+    font-size: 24px;
+    text-align: right;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: #f3f3f3;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+  }
+  .mode-selector, .base-selector {
+    margin-bottom: 15px;
+    width: 100%;
+    font-size: 16px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+  }
+  .buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .buttons button {
+    height: 50px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    background: #e0e0e0;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .buttons button:hover { background: #d5d5d5; }
+  .buttons button:active { transform: scale(0.95); }
+  .buttons .equal { background: #4CAF50; color: white; font-weight: bold; }
+  .buttons .equal:hover { background: #43a047; }
+  .buttons .clear { background: #f44336; color: white; font-weight: bold; }
+  .buttons .clear:hover { background: #e53935; }
+  .result-container { font-family: monospace; background:#f3f3f3; border-radius:8px; padding:10px; }
+  .result-container div { margin: 5px 0; }
+</style>
 </head>
 <body>
-  <div class="calculator">
-    <h1>Calculator</h1>
-    <input type="text" id="display" class="display" disabled>
-    <div class="buttons">
-      <button onclick="append('7')">7</button>
-      <button onclick="append('8')">8</button>
-      <button onclick="append('9')">9</button>
-      <button onclick="append('/')">÷</button>
+<div class="calculator">
+  <h1>Calculator</h1>
+  <select id="mode" class="mode-selector">
+    <option value="normal">Normal</option>
+    <option value="scientific">Scientific</option>
+    <option value="programming">Programming</option>
+  </select>
 
-      <button onclick="append('4')">4</button>
-      <button onclick="append('5')">5</button>
-      <button onclick="append('6')">6</button>
-      <button onclick="append('*')">×</button>
+  <select id="base" class="base-selector" style="display:none">
+    <option value="DEC">Decimal</option>
+    <option value="HEX">Hexadecimal</option>
+    <option value="OCT">Octal</option>
+    <option value="BIN">Binary</option>
+  </select>
 
-      <button onclick="append('1')">1</button>
-      <button onclick="append('2')">2</button>
-      <button onclick="append('3')">3</button>
-      <button onclick="append('-')">−</button>
+  <input type="text" id="display" class="display" disabled>
+  <div class="buttons" id="buttons-container"></div>
 
-      <button onclick="append('0')">0</button>
-      <button onclick="append('.')">.</button>
-      <button class="clear" onclick="clearDisplay()">C</button>
-      <button class="equal" onclick="calculate()">=</button>
-    </div>
+  <div class="result-container" id="programming-result" style="display:none">
+    <div>DEC: <span id="res-dec"></span></div>
+    <div>HEX: <span id="res-hex"></span></div>
+    <div>OCT: <span id="res-oct"></span></div>
+    <div>BIN: <span id="res-bin"></span></div>
   </div>
+</div>
 
-  <script>
-    const display = document.getElementById("display");
+<script>
+const display = document.getElementById("display");
+const buttonsContainer = document.getElementById("buttons-container");
+const modeSelector = document.getElementById("mode");
+const baseSelector = document.getElementById("base");
+const resultContainer = document.getElementById("programming-result");
+const resDec = document.getElementById("res-dec");
+const resHex = document.getElementById("res-hex");
+const resOct = document.getElementById("res-oct");
+const resBin = document.getElementById("res-bin");
 
-    function append(val) {
-      display.value += val;
-    }
+const buttonLayouts = {
+  normal: [["7","8","9","/"],["4","5","6","*"],["1","2","3","-"],["0",".","C","="],["+","","",""]],
+  scientific: [["sin","cos","tan","^"],["log","√","(",")"],["7","8","9","/"],["4","5","6","*"],["1","2","3","-"],["0",".","C","="],["+","","",""]],
+  programming: [["AND","OR","XOR","NOT"],["A","B","C","D"],["E","F","0","1"],["2","3","4","5"],["6","7","8","9"],["C","=","+","-"]]
+};
 
-    function calculate() {
-      try {
-        display.value = eval(display.value);
-      } catch {
-        display.value = "Error";
-      }
-    }
-
-    function clearDisplay() {
-      display.value = "";
-    }
-
-    // Keyboard support
-    document.addEventListener("keydown", function(event) {
-      const key = event.key;
-
-      if (!isNaN(key) || ["+", "-", "*", "/", "."].includes(key)) {
-        append(key);
-      } else if (key === "Enter") {
-        event.preventDefault();
-        calculate();
-      } else if (key === "Escape" || key.toLowerCase() === "c") {
-        clearDisplay();
-      } else if (key === "Backspace") {
-        display.value = display.value.slice(0, -1);
-      }
+function generateButtons(mode){
+  buttonsContainer.innerHTML = "";
+  buttonLayouts[mode].forEach(row=>{
+    row.forEach(label=>{
+      if(!label) return;
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      if(label==="=") btn.classList.add("equal");
+      if(label==="C") btn.classList.add("clear");
+      btn.addEventListener("click",()=>append(label));
+      buttonsContainer.appendChild(btn);
     });
-  </script>
+  });
+}
+
+function append(val){
+  if(val==="C") display.value="";
+  else display.value += val;
+
+  const mode = modeSelector.value;
+  if(mode==="scientific" || mode==="programming") calculate(); // live update only for these
+}
+
+function calculate(){
+  try{
+    const mode = modeSelector.value;
+    let val = display.value;
+    if(!val) return;
+
+    if(mode==="scientific"){
+      let expr = val.replace(/sin/g,"Math.sin").replace(/cos/g,"Math.cos").replace(/tan/g,"Math.tan")
+        .replace(/log/g,"Math.log10").replace(/√/g,"Math.sqrt").replace(/\^/g,"**");
+      display.value = eval(expr);
+    } else if(mode==="programming"){
+      const base = baseSelector.value;
+      let inputVal = val;
+      if(base==="HEX") inputVal = parseInt(val,16);
+      else if(base==="OCT") inputVal = parseInt(val,8);
+      else if(base==="BIN") inputVal = parseInt(val,2);
+      else inputVal = parseInt(val,10);
+
+      let expr = inputVal.toString();
+      expr = expr.replace(/AND/g,"&").replace(/OR/g,"|").replace(/XOR/g,"^").replace(/NOT/g,"~");
+      let result = eval(expr);
+
+      resDec.textContent = result;
+      resHex.textContent = result.toString(16).toUpperCase();
+      resOct.textContent = result.toString(8);
+      resBin.textContent = result.toString(2);
+      resultContainer.style.display="block";
+    }
+  } catch { /* ignore incomplete inputs */ }
+}
+
+// Normal calculator only calculates on "=" or Enter
+function calculateNormal() {
+  try { display.value = eval(display.value); }
+  catch { display.value="Error"; }
+}
+
+// Keyboard support
+document.addEventListener("keydown", function(event){
+  const key = event.key.toUpperCase();
+  const mode = modeSelector.value;
+
+  if(key==="ENTER") { event.preventDefault(); if(mode==="normal") calculateNormal(); return; }
+  if(key==="ESCAPE" || key==="C") { display.value=""; if(mode==="programming") resultContainer.style.display="none"; return; }
+  if(key==="BACKSPACE") { display.value=display.value.slice(0,-1); if(mode==="scientific"||mode==="programming") calculate(); return; }
+
+  if(mode==="normal"){
+    if(!isNaN(key) || ["+","-","*","/","."].includes(key)) append(key);
+  } else if(mode==="scientific"){
+    if(!isNaN(key) || ["+","-","*","/","(",")","."].includes(key)) append(key);
+    else if(key==="S") append("sin");
+    else if(key==="C") append("cos");
+    else if(key==="T") append("tan");
+    else if(key==="L") append("log");
+    else if(key==="R") append("√");
+    else if(key==="^") append("^");
+  } else if(mode==="programming"){
+    if(!isNaN(key) || ["A","B","C","D","E","F","+","-","*","/"].includes(key)) append(key);
+  }
+});
+
+// Mode & Base changes
+modeSelector.addEventListener("change",()=>{
+  generateButtons(modeSelector.value);
+  baseSelector.style.display = modeSelector.value==="programming" ? "block" : "none";
+  display.value=""; resultContainer.style.display="none";
+});
+baseSelector.addEventListener("change",()=>{ display.value=""; resultContainer.style.display="none"; });
+
+// Initial
+generateButtons(modeSelector.value);
+</script>
 </body>
 </html>
 
