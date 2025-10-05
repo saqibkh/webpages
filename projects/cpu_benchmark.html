@@ -219,17 +219,46 @@ class Progress {
 }
 
 /* ---------- System Info ---------- */
-function getSystemInfo(){
+function getCPUModel() {
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  let cpuModel = 'Unknown';
+
+  // Check common CPU identifiers
+  const patterns = [
+    /(AMD Ryzen [^\s;]+)/i,
+    /(Intel(?: Core)? [^\s;]+)/i,
+    /(AMD [^\s;]+)/i,
+    /(Intel [^\s;]+)/i
+  ];
+
+  for (const regex of patterns) {
+    const match = ua.match(regex);
+    if (match) { cpuModel = match[0]; break; }
+  }
+
+  // Fallback: check platform string
+  if (cpuModel === 'Unknown' && /Win/i.test(platform)) cpuModel = 'x86 (Windows)';
+  if (cpuModel === 'Unknown' && /Mac/i.test(platform)) cpuModel = 'Apple Silicon or Intel (Mac)';
+  if (cpuModel === 'Unknown' && /Linux/i.test(platform)) cpuModel = 'x86_64 (Linux)';
+
+  return cpuModel;
+}
+
+function getSystemInfo() {
   const cores = navigator.hardwareConcurrency || 'Unknown';
   const ram = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'Unknown';
   const platform = navigator.platform || 'Unknown';
-  const ua = navigator.userAgent || 'Unknown';
+  const ua = navigator.userAgent || '';
+  const cpuModel = getCPUModel();
+
+  // GPU detection
   let canvas = document.createElement('canvas');
   let gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
   let gpu = 'Unknown';
-  if(gl){
+  if (gl) {
     const debug = gl.getExtension('WEBGL_debug_renderer_info');
-    if(debug){
+    if (debug) {
       const renderer = gl.getParameter(debug.UNMASKED_RENDERER_WEBGL);
       const vendor = gl.getParameter(debug.UNMASKED_VENDOR_WEBGL);
       gpu = `${renderer} (${vendor})`;
@@ -237,13 +266,25 @@ function getSystemInfo(){
       gpu = gl.getParameter(gl.RENDERER) || 'Unknown';
     }
   }
-  return { cpuCores: cores, ram, platform, gpu, userAgent: ua };
+
+  return {
+    cpuModel,
+    cpuCores: cores,
+    logicalProcessors: cores,
+    ram,
+    platform,
+    gpu,
+    userAgent: ua
+  };
 }
+
 function displaySystemInfoToUI(sys){
   const container = document.getElementById('systemInfo');
   container.innerHTML = `
-    <p><strong>CPU Cores:</strong> ${sys.cpuCores}</p>
-    <p><strong>Approx. RAM:</strong> ${sys.ram}</p>
+    <p><strong>CPU Model:</strong> ${sys.cpuModel}</p>
+    <p><strong>Cores:</strong> ${sys.cpuCores}</p>
+    <p><strong>Logical Processors:</strong> ${sys.logicalProcessors}</p>
+    <p><strong>RAM:</strong> ${sys.ram}</p>
     <p><strong>Platform:</strong> ${sys.platform}</p>
     <p><strong>GPU:</strong> ${sys.gpu}</p>
     <p style="word-break:break-word"><strong>Browser / OS:</strong> ${sys.userAgent}</p>
