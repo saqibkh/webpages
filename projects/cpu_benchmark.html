@@ -158,12 +158,14 @@
 
   <div class="card">
     <h2>
-      Network Latency
+      Network Performance
       <span class="info-icon">i
-        <span class="tooltip-text">Measures network latency by pinging a server multiple times.</span>
+        <span class="tooltip-text">Measures ping, download speed, and upload speed of your network.</span>
       </span>
     </h2>
     <p>Ping: <strong id="pingScore">-</strong> ms</p>
+    <p>Download: <strong id="downloadSpeed">-</strong> Mbps</p>
+    <p>Upload: <strong id="uploadSpeed">-</strong> Mbps</p>
     <div class="progress-container-inner"><div id="pingProgress" class="progress-bar-inner">0%</div></div>
     <canvas id="pingChart"></canvas>
   </div>
@@ -391,31 +393,81 @@ async function storageBenchmark(progress){
 }
 
 /* Network latency (uses AbortController to allow abortion) */
-async function networkBenchmark(progress){
-  if (abortRequested) { setInner('pingScore','Aborted'); updateBar('pingProgress',0); progress.step(); return null; }
-  const url = "https://cors-anywhere.herokuapp.com/https://www.google.com";
-  const pings = [];
-  networkAbortController = new AbortController();
-  for (let i=0;i<5;i++){
-    if (abortRequested) { networkAbortController.abort(); setInner('pingScore','Aborted'); updateBar('pingProgress',((i)/5)*100); progress.step(); return null; }
+async function networkBenchmark(progress, pingRepeats = 10, downloadRepeats = 10){
+  if (abortRequested) { 
+    setInner('pingScore','Aborted'); 
+    setInner('downloadSpeed','-'); 
+    setInner('uploadSpeed','N/A');
+    updateBar('pingProgress',0); 
+    progress.step(); 
+    return null; 
+  }
+
+  const url = "https://cors-anywhere.herokuapp.com/https://speed.hetzner.de/1MB.bin";
+  const pingSamples = [];
+  const downloadSamples = [];
+
+  // --- Ping Tests ---
+  for (let i = 0; i < pingRepeats; i++) {
+    if (abortRequested) break;
     const start = performance.now();
-    try {
-      await fetch(url, { mode:'no-cors', signal: networkAbortController.signal });
-    } catch(e){
-      // fetch might throw due to no-cors or abort; we still measure time
-    }
+    try { await fetch(url, { method:'HEAD', cache:'no-cache' }); } catch(e){}
     const end = performance.now();
-    pings.push(end-start);
-    updateBar('pingProgress', ((i+1)/5)*100 );
+    pingSamples.push(end - start);
+    updateBar('pingProgress', ((i+1)/(pingRepeats + downloadRepeats))*100 ); // partial progress
     await sleep(50);
   }
-  const avg = Math.round(pings.reduce((a,b)=>a+b,0)/pings.length);
-  results.network = { avgPingMs: avg, samples: pings.slice() };
-  setInner('pingScore', avg);
-  new Chart(document.getElementById('pingChart'), { type:'bar', data:{ labels:['Ping ms'], datasets:[{ label:'ms', data:[avg], backgroundColor:'#ff3333' }] }});
+  const avgPing = Math.round(pingSamples.reduce((a,b)=>a+b,0)/pingSamples.length);
+  setInner('pingScore', avgPing);
+
+  // --- Download Tests ---
+  for (let i = 0; i < downloadRepeats; i++) {
+    if (abortRequested) break;
+    const startTime = performance.now();
+    try {
+      const resp = await fetch(url, { cache:'no-cache' });
+      await resp.arrayBuffer();
+      const durationSec = (performance.now() - startTime) / 1000;
+      const mbps = (8 * 1024 * 1024 / 1e6 / durationSec); // 1MB file
+      downloadSamples.push(mbps);
+    } catch(e) {
+      console.warn("Download attempt failed:", e);
+    }
+    updateBar('pingProgress', ((pingRepeats + i + 1)/(pingRepeats + downloadRepeats))*100 );
+    await sleep(100);
+  }
+  const avgDownload = downloadSamples.length > 0 ? (downloadSamples.reduce((a,b)=>a+b,0)/downloadSamples.length).toFixed(2) : 'Error';
+  setInner('downloadSpeed', avgDownload);
+
+  // Upload not feasible in browser
+  setInner('uploadSpeed','N/A');
+
+  // Save results
+  results.network = {
+    avgPingMs: avgPing,
+    downloadMbps: parseFloat(avgDownload) || null,
+    uploadMbps: null,
+    pingSamples,
+    downloadSamples
+  };
+
+  // Chart update
+  new Chart(document.getElementById('pingChart'), {
+    type:'bar',
+    data:{
+      labels:['Ping ms','Download Mbps','Upload'],
+      datasets:[{
+        label:'Network',
+        data:[avgPing, parseFloat(avgDownload)||0, 0],
+        backgroundColor:['#ff3333','#33ccff','#ff9900']
+      }]
+    }
+  });
+
   progress.step();
   return results.network;
 }
+
 
 /* ---------- Orchestration / Runner ---------- */
 async function runSelectedTests(){
