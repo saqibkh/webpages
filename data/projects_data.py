@@ -1,5 +1,15 @@
 projects = [
     {
+      "name": "Advanced Browser System Benchmark",
+      "description": "A browser-based benchmark that measures CPU, memory, GPU, storage, network, and overall system performance.",
+      "link": "projects/cpu_benchmark.html",
+      "details": (
+          "This application runs a series of tests directly in your browser to evaluate your computer’s hardware capabilities. It measures CPU speed via intensive math operations, memory bandwidth by reading/writing large arrays, GPU performance with WebGL frame rendering, storage throughput using local storage, and network speed with ping and download tests. Results are displayed with progress bars, charts, and can be exported as JSON or CSV for further analysis. All tests are safe, non-blocking, and can be stopped mid-run."
+        ),
+      "type": "application"
+    },
+
+    {
       "name": "Paddle Smash",
       "description": "A visually enhanced block-breaking game with multiple levels, paddle control, and real-time scoring.",
       "link": "projects/paddle_smash.html",
