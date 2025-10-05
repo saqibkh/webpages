@@ -193,23 +193,92 @@ function drawBlocks(){ for(let r=0;r<blockRows;r++){ for(let c=0;c<blockCols;c++
 function drawParticles(){ for(let p of particles){ ctx.beginPath(); ctx.arc(p.x,p.y,p.radius,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,0.5)"; ctx.fill(); ctx.closePath(); p.x+=p.dx; p.y+=p.dy; if(p.x<0||p.x>canvas.width)p.dx*=-1; if(p.y<0||p.y>canvas.height)p.dy*=-1; } }
 function drawBallTrail(){ ctx.beginPath(); ctx.arc(ball.x-ball.dx,ball.y-ball.dy,ball.radius*0.9,0,Math.PI*2); ctx.fillStyle="rgba(255,87,34,0.5)"; ctx.fill(); ctx.closePath(); }
 
-function draw(){
-  if(paused || gameOver){ 
-	animationId = requestAnimationFrame(draw); 
-	return; 
+function draw() {
+  if (paused || gameOver) {
+    animationId = requestAnimationFrame(draw);
+    return;
   }
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawParticles(); drawBlocks(); drawPaddle(); drawBallTrail(); drawBall();
-  paddle.x+=paddle.speed; if(paddle.x<0)paddle.x=0; if(paddle.x+paddle.width>canvas.width)paddle.x=canvas.width-paddle.width;
-  
-  if(ball.released){
-    ball.x+=ball.dx; ball.y+=ball.dy;
-    if(ball.x+ball.radius>canvas.width||ball.x-ball.radius<0) ball.dx*=-1;
-    if(ball.y-ball.radius<0) ball.dy*=-1;
-    if(ball.y+ball.radius>paddle.y && ball.y+ball.radius<paddle.y+paddle.height && ball.x>paddle.x && ball.x<paddle.x+paddle.width){ ball.dy=-Math.abs(ball.dy); playSound(paddleSound); }
-    for(let r=0;r<blockRows;r++){ for(let c=0;c<blockCols;c++){ let b=blocks[r][c]; if(b.status && ball.x>b.x && ball.x<b.x+blockWidth && ball.y>b.y && ball.y<b.y+blockHeight){ ball.dy*=-1; b.status=0; score++; playSound(blockSound); for(let i=0;i<10;i++){ particles.push({x:ball.x,y:ball.y,radius:Math.random()*2+1,dx:(Math.random()-0.5)*5,dy:(Math.random()-0.5)*5}); } if(score===blockRows*blockCols){ gameWon=true; endGame(); }}}}
-    if(ball.y+ball.radius>canvas.height){ gameOver=true; endGame(); }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw all visual elements
+  drawParticles();
+  drawBlocks();
+  drawPaddle();
+  drawBallTrail();
+  drawBall();
+
+  // Move paddle
+  paddle.x += paddle.speed;
+  if (paddle.x < 0) paddle.x = 0;
+  if (paddle.x + paddle.width > canvas.width)
+    paddle.x = canvas.width - paddle.width;
+
+  // Ball motion
+  if (ball.released) {
+    ball.x += ball.dx;
+    ball.y += ball.dy;
+
+    // Wall collisions
+    if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0)
+      ball.dx *= -1;
+    if (ball.y - ball.radius < 0)
+      ball.dy *= -1;
+
+    // --- ✅ Improved Paddle Collision ---
+    if (
+      ball.dy > 0 && // only check when ball moving downward
+      ball.y + ball.radius >= paddle.y && 
+      ball.y - ball.dy + ball.radius <= paddle.y + paddle.height && 
+      ball.x + ball.radius > paddle.x &&
+      ball.x - ball.radius < paddle.x + paddle.width
+    ) {
+      ball.y = paddle.y - ball.radius; // reposition to top of paddle
+      ball.dy = -Math.abs(ball.dy);    // bounce upward
+      playSound(paddleSound);
+    }
+
+    // --- Block collisions ---
+    for (let r = 0; r < blockRows; r++) {
+      for (let c = 0; c < blockCols; c++) {
+        let b = blocks[r][c];
+        if (
+          b.status &&
+          ball.x > b.x && ball.x < b.x + blockWidth &&
+          ball.y > b.y && ball.y < b.y + blockHeight
+        ) {
+          ball.dy *= -1;
+          b.status = 0;
+          score++;
+          playSound(blockSound);
+
+          // explosion particles
+          for (let i = 0; i < 10; i++) {
+            particles.push({
+              x: ball.x,
+              y: ball.y,
+              radius: Math.random() * 2 + 1,
+              dx: (Math.random() - 0.5) * 5,
+              dy: (Math.random() - 0.5) * 5
+            });
+          }
+
+          // check for win
+          if (score === blockRows * blockCols) {
+            gameWon = true;
+            endGame();
+          }
+        }
+      }
+    }
+
+    // --- Ball missed (bottom of screen) ---
+    if (ball.y - ball.dy - ball.radius > canvas.height) {
+      gameOver = true;
+      endGame();
+    }
   }
+
   animationId = requestAnimationFrame(draw);
 }
 
