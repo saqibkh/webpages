@@ -229,27 +229,65 @@ function restartGame(){
 
 // High scores
 function saveScore(level,score,time){
-  let key="highscores_level_"+level;
-  let scores=JSON.parse(localStorage.getItem(key))||[];
-  scores.push({score,time});
-  scores.sort((a,b)=>b.score!==a.score?b.score-a.score:a.time-b.time);
-  scores=scores.slice(0,10);
-  localStorage.setItem(key,JSON.stringify(scores));
-  displayHighScores(level); updateScoreTab(level);
+  let key = "highscores_level_" + level;
+  let scores = JSON.parse(localStorage.getItem(key)) || [];
+
+  // Sort existing scores (highest score, then shortest time)
+  scores.sort((a, b) => b.score !== a.score ? b.score - a.score : a.time - b.time);
+
+  // Check if this score qualifies (top 10 or better than the lowest one)
+  let qualifies = scores.length < 10 || 
+    score > scores[scores.length - 1].score || 
+    (score === scores[scores.length - 1].score && time < scores[scores.length - 1].time);
+
+  // Ask for name only if qualifies
+  let playerName = "Unknown";
+  if (qualifies) {
+    playerName = prompt("🎮 You made the top 10! Enter your name:", "Unknown");
+    if (!playerName || playerName.trim() === "") playerName = "Unknown";
+    scores.push({ name: playerName, score, time });
+  }
+
+  // Sort again and trim to top 10
+  scores.sort((a, b) => b.score !== a.score ? b.score - a.score : a.time - b.time);
+  scores = scores.slice(0, 10);
+
+  // Save back to localStorage
+  localStorage.setItem(key, JSON.stringify(scores));
+
+  // Update displays
+  displayHighScores(level);
+  updateScoreTab(level);
 }
-function displayHighScores(level){
-  let scores=JSON.parse(localStorage.getItem("highscores_level_"+level))||[];
-  if(scores.length===0){ highscoresContainer.innerHTML="<p>No high scores yet.</p>"; return; }
-  let html="<h3>Top 10 Scores (Level "+level+")</h3><ol>";
-  scores.forEach(s=>{ html+=`<li>Score: ${s.score} | Time: ${s.time}s</li>`; });
-  html+="</ol>"; highscoresContainer.innerHTML=html;
+
+function displayHighScores(level) {
+  let scores = JSON.parse(localStorage.getItem("highscores_level_" + level)) || [];
+  if (scores.length === 0) {
+    highscoresContainer.innerHTML = "<p>No high scores yet.</p>";
+    return;
+  }
+
+  let html = `<h3>Top 10 Scores (Level ${level})</h3><ol>`;
+  scores.forEach(s => {
+    html += `<li>${s.name}: Score ${s.score} | Time: ${s.time}s</li>`;
+  });
+  html += "</ol>";
+  highscoresContainer.innerHTML = html;
 }
-function updateScoreTab(level){
-  let scores=JSON.parse(localStorage.getItem("highscores_level_"+level))||[];
-  if(scores.length===0){ scoresDisplay.innerHTML="No high scores yet."; return; }
-  let html="<ol>";
-  scores.forEach(s=>{ html+=`<li>Score: ${s.score} | Time: ${s.time}s</li>`; });
-  html+="</ol>"; scoresDisplay.innerHTML=html;
+
+function updateScoreTab(level) {
+  let scores = JSON.parse(localStorage.getItem("highscores_level_" + level)) || [];
+  if (scores.length === 0) {
+    scoresDisplay.innerHTML = "No high scores yet.";
+    return;
+  }
+
+  let html = "<ol>";
+  scores.forEach(s => {
+    html += `<li>${s.name}: ${s.score} pts | ${s.time}s</li>`;
+  });
+  html += "</ol>";
+  scoresDisplay.innerHTML = html;
 }
 
 updateScoreTab(parseInt(viewLevelSelect.value));
