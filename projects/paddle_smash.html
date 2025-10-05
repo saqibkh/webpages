@@ -46,10 +46,23 @@ canvas {
   transition:max-height 0.4s ease, opacity 0.4s ease; opacity:0; white-space:nowrap;
 }
 #score-tab:hover #scores-display { max-height:300px; opacity:1; white-space:normal; }
+
+#timer {
+  position: absolute;
+  top: 70px;
+  width: 100%;
+  text-align: center;
+  color: white;
+  font-size: 1.5em;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+  z-index: 5;
+}
+
 </style>
 </head>
 <body>
 <h1>Paddle Smash</h1>
+<div id="timer">00:00</div>
 <canvas id="gameCanvas"></canvas>
 
 <!-- Score Tab -->
@@ -102,6 +115,7 @@ const scoresDisplay=document.getElementById("scores-display");
 const paddleSound=document.getElementById("paddle-sound");
 const blockSound=document.getElementById("block-sound");
 
+let animationId;
 let paddle={width:100,height:12,x:0,y:0,speed:0};
 let ball={x:0,y:0,radius:10,dx:0,dy:0,released:false};
 let baseSpeed=0;
@@ -109,6 +123,29 @@ const blockRows=5,blockCols=8,blockHeight=20,blockPadding=10,blockOffsetTop=30,b
 let blocks=[],blockWidth;
 let score=0,gameOver=false,gameWon=false,startTime=null,level=1,paused=false;
 let particles=[];
+
+let timerInterval = null;
+let elapsedSeconds = 0;
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const secs = (seconds % 60).toString().padStart(2, '0');
+  return `${mins}:${secs}`;
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  elapsedSeconds = 0;
+  document.getElementById("timer").textContent = formatTime(elapsedSeconds);
+  timerInterval = setInterval(() => {
+    elapsedSeconds++;
+    document.getElementById("timer").textContent = formatTime(elapsedSeconds);
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+}
 
 function initParticles(){ particles=[]; for(let i=0;i<50;i++){ particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,radius:Math.random()*2+1,dx:(Math.random()-0.5),dy:(Math.random()-0.5)}); }}
 function initBlocks(){ blocks=[]; blockWidth=(canvas.width-blockOffsetLeft*2-blockPadding*(blockCols-1))/blockCols; for(let r=0;r<blockRows;r++){ blocks[r]=[]; for(let c=0;c<blockCols;c++){ blocks[r][c]={x:0,y:0,status:1,row:r}; }}}
@@ -122,9 +159,10 @@ function startGame(){
   levelOverlay.style.display="none"; 
   gameOver=false; gameWon=false; score=0; startTime=null; 
   ball.released=false; ball.dx=0; ball.dy=0; 
-  baseSpeed=2+level; 
+  baseSpeed=2+level;
+  cancelAnimationFrame(animationId);
   initBlocks(); initParticles(); 
-  requestAnimationFrame(draw); 
+  animationId = requestAnimationFrame(draw); 
 }
 
 canvas.addEventListener("mousemove",e=>{ const rect=canvas.getBoundingClientRect(); paddle.x=e.clientX-rect.left-paddle.width/2; if(paddle.x<0)paddle.x=0; if(paddle.x+paddle.width>canvas.width)paddle.x=canvas.width-paddle.width; if(!ball.released){ ball.x=paddle.x+paddle.width/2; ball.y=paddle.y-ball.radius; } });
@@ -142,7 +180,8 @@ function launchBall(){
 		ball.released=true; 
 		ball.dx=baseSpeed; 
 		ball.dy=-baseSpeed; 
-		if(!startTime) startTime=Date.now(); 
+		if(!startTime) startTime=Date.now();
+		startTimer();
 	}
 }
 
@@ -155,7 +194,10 @@ function drawParticles(){ for(let p of particles){ ctx.beginPath(); ctx.arc(p.x,
 function drawBallTrail(){ ctx.beginPath(); ctx.arc(ball.x-ball.dx,ball.y-ball.dy,ball.radius*0.9,0,Math.PI*2); ctx.fillStyle="rgba(255,87,34,0.5)"; ctx.fill(); ctx.closePath(); }
 
 function draw(){
-  if(paused || gameOver){ requestAnimationFrame(draw); return; }
+  if(paused || gameOver){ 
+	animationId = requestAnimationFrame(draw); 
+	return; 
+  }
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawParticles(); drawBlocks(); drawPaddle(); drawBallTrail(); drawBall();
   paddle.x+=paddle.speed; if(paddle.x<0)paddle.x=0; if(paddle.x+paddle.width>canvas.width)paddle.x=canvas.width-paddle.width;
@@ -168,17 +210,22 @@ function draw(){
     for(let r=0;r<blockRows;r++){ for(let c=0;c<blockCols;c++){ let b=blocks[r][c]; if(b.status && ball.x>b.x && ball.x<b.x+blockWidth && ball.y>b.y && ball.y<b.y+blockHeight){ ball.dy*=-1; b.status=0; score++; playSound(blockSound); for(let i=0;i<10;i++){ particles.push({x:ball.x,y:ball.y,radius:Math.random()*2+1,dx:(Math.random()-0.5)*5,dy:(Math.random()-0.5)*5}); } if(score===blockRows*blockCols){ gameWon=true; endGame(); }}}}
     if(ball.y+ball.radius>canvas.height){ gameOver=true; endGame(); }
   }
-  requestAnimationFrame(draw);
+  animationId = requestAnimationFrame(draw);
 }
 
 function endGame(){
   ball.released=false; overlay.style.display="flex";
   finalScore.innerText="Score: "+score;
+  stopTimer();
   let time=Math.floor((Date.now()-startTime)/1000);
   saveScore(level,score,time);
 }
 
-function restartGame(){ overlay.style.display="none"; levelOverlay.style.display="flex"; }
+function restartGame(){ 
+  overlay.style.display="none"; 
+  levelOverlay.style.display="flex";
+  document.getElementById("timer").textContent = "00:00";
+}
 
 // High scores
 function saveScore(level,score,time){
