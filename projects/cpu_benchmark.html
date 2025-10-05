@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Advanced Browser System Benchmark — Stop & Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; background:#121212; color:#f4f4f9; }
+  header { padding:18px; text-align:center; }
+  h1 { margin:0; color:#1db954; font-size:1.8rem; }
+  #controls { display:flex; gap:10px; justify-content:center; padding:14px; flex-wrap:wrap; }
+  button { padding:10px 18px; font-size:15px; border:0; border-radius:8px; cursor:pointer; background:#1db954; color:#fff; }
+  button.secondary { background:#2b2b2b; }
+  #testSelection { width:90%; margin:8px auto; display:flex; flex-wrap:wrap; gap:12px; justify-content:center; }
+  #progress-container { width:90%; height:24px; background:#333; border-radius:12px; margin:8px auto; overflow:hidden; }
+  #progress-bar { height:100%; width:0%; background:#1db954; text-align:center; line-height:24px; transition:width .2s ease; }
+  #results { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:18px; padding:18px; }
+  .card { background:#1e1e1e; border-radius:12px; padding:16px; box-shadow:0 6px 18px rgba(0,0,0,0.35); }
+  .card h2 { margin:0 0 8px 0; color:#1db954; }
+  .card p { margin:6px 0; font-size:0.95rem; }
+  .progress-container-inner { width:100%; height:14px; background:#333; border-radius:8px; overflow:hidden; margin-top:8px; }
+  .progress-bar-inner { height:100%; width:0%; background:#1db954; text-align:center; line-height:14px; font-size:11px; transition:width .08s linear; }
+  canvas { width:100% !important; height:140px !important; margin-top:12px; }
+  #reportButtons { display:flex; gap:10px; justify-content:center; padding:12px; }
+  .note { text-align:center; font-size:0.9rem; color:#bfbfbf; padding-bottom:8px; }
+  @media (max-width:520px){ canvas{height:180px !important;} h1{font-size:1.4rem;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Advanced Browser System Benchmark</h1>
+  <div class="note">Choose tests, press <strong>Start Benchmark</strong>. You can Stop mid-run. Download results as JSON/CSV when finished.</div>
+</header>
+
+<div id="testSelection" aria-hidden="false">
+  <label><input type="checkbox" id="chkSystem" checked> System Info</label>
+  <label><input type="checkbox" id="chkCPU" checked> CPU</label>
+  <label><input type="checkbox" id="chkMemory" checked> Memory</label>
+  <label><input type="checkbox" id="chkGPU" checked> GPU</label>
+  <label><input type="checkbox" id="chkStorage" checked> Storage</label>
+  <label><input type="checkbox" id="chkNetwork" checked> Network</label>
+</div>
+
+<div id="controls">
+  <button id="startBtn">Start Benchmark</button>
+  <button id="stopBtn" class="secondary" disabled>Stop</button>
+</div>
+
+<div id="progress-container"><div id="progress-bar">0%</div></div>
+
+<div id="results">
+  <div class="card" id="systemInfoCard">
+    <h2>System Information</h2>
+    <div id="systemInfo"><em>Not displayed until run (or enable System Info).</em></div>
+  </div>
+
+  <div class="card">
+    <h2>CPU Performance</h2>
+    <p>Score: <strong id="cpuScore">-</strong></p>
+    <div class="progress-container-inner"><div id="cpuProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="cpuChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Memory Performance</h2>
+    <p>Bandwidth: <strong id="memScore">-</strong> MB/s</p>
+    <div class="progress-container-inner"><div id="memProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="memChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>GPU / WebGL Stress (Live FPS)</h2>
+    <p>FPS: <strong id="gpuScore">-</strong></p>
+    <div class="progress-container-inner"><div id="gpuProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="gpuChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Storage Performance</h2>
+    <p>Write Speed: <strong id="storageScore">-</strong> MB/s</p>
+    <div class="progress-container-inner"><div id="storageProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="storageChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Network Latency</h2>
+    <p>Ping: <strong id="pingScore">-</strong> ms</p>
+    <div class="progress-container-inner"><div id="pingProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="pingChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Overall PC Score</h2>
+    <p>Score: <strong id="overallScore">-</strong></p>
+  </div>
+</div>
+
+<div id="reportButtons" aria-hidden="true">
+  <button id="downloadJson" class="secondary" disabled>Download JSON</button>
+  <button id="downloadCsv" class="secondary" disabled>Download CSV</button>
+</div>
+
+<script>
+/* ---------- Utilities ---------- */
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function setInner(id, txt){ const e=document.getElementById(id); if(e) e.innerText=txt; }
+function updateBar(id, pct){ const e=document.getElementById(id); if(!e) return; e.style.width = Math.max(0,Math.min(100,pct)) + '%'; e.innerText = Math.round(Math.max(0,Math.min(100,pct))) + '%'; }
+
+/* ---------- Abort / Run State ---------- */
+let abortRequested = false;
+let running = false;
+let networkAbortController = null;
+let gpuAnimationHandle = null;
+
+/* ---------- Result Object ---------- */
+function createEmptyResults() {
+  return {
+    meta: { startedAt: null, endedAt: null, aborted: false, selectedTests: {} },
+    system: null,
+    cpu: null,
+    memory: null,
+    gpu: null,
+    storage: null,
+    network: null
+  };
+}
+let results = createEmptyResults();
+
+/* ---------- Progress helper ---------- */
+class Progress {
+  constructor(total){ this.total=total; this.completed=0; }
+  step(){ this.completed++; updateBar('progress-bar', (this.completed/this.total)*100 ); }
+}
+
+/* ---------- System Info ---------- */
+function getSystemInfo(){
+  const cores = navigator.hardwareConcurrency || 'Unknown';
+  const ram = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'Unknown';
+  const platform = navigator.platform || 'Unknown';
+  const ua = navigator.userAgent || 'Unknown';
+  let canvas = document.createElement('canvas');
+  let gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  let gpu = 'Unknown';
+  if(gl){
+    const debug = gl.getExtension('WEBGL_debug_renderer_info');
+    if(debug){
+      const renderer = gl.getParameter(debug.UNMASKED_RENDERER_WEBGL);
+      const vendor = gl.getParameter(debug.UNMASKED_VENDOR_WEBGL);
+      gpu = `${renderer} (${vendor})`;
+    } else {
+      gpu = gl.getParameter(gl.RENDERER) || 'Unknown';
+    }
+  }
+  return { cpuCores: cores, ram, platform, gpu, userAgent: ua };
+}
+function displaySystemInfoToUI(sys){
+  const container = document.getElementById('systemInfo');
+  container.innerHTML = `
+    <p><strong>CPU Cores:</strong> ${sys.cpuCores}</p>
+    <p><strong>Approx. RAM:</strong> ${sys.ram}</p>
+    <p><strong>Platform:</strong> ${sys.platform}</p>
+    <p><strong>GPU:</strong> ${sys.gpu}</p>
+    <p style="word-break:break-word"><strong>Browser / OS:</strong> ${sys.userAgent}</p>
+  `;
+}
+
+/* ---------- Benchmarks (all check abortRequested frequently) ---------- */
+
+/* CPU (chunked, non-blocking) */
+async function cpuBenchmark(progress){
+  if (abortRequested) { setInner('cpuScore','Aborted'); updateBar('cpuProgress',0); progress.step(); return null; }
+  const total = 1e8;
+  let i = 0;
+  let sum = 0;
+  const chunk = 1e6;
+  const start = performance.now();
+  while(i < total){
+    if (abortRequested){ setInner('cpuScore','Aborted'); updateBar('cpuProgress', (i/total)*100 ); progress.step(); return null; }
+    const end = Math.min(i+chunk, total);
+    for(; i < end; i++) sum += Math.sqrt(i)*Math.sin(i);
+    updateBar('cpuProgress', (i/total)*100 );
+    await sleep(0); // yield
+  }
+  const duration = (performance.now() - start) / 1000;
+  const score = (total / duration).toFixed(2);
+  results.cpu = { score: Number(score), durationSec: Number(duration) };
+  setInner('cpuScore', score);
+  new Chart(document.getElementById('cpuChart'), { type:'bar', data:{ labels:['CPU'], datasets:[{ label:'Score', data:[score], backgroundColor:'#ff9900' }] }});
+  progress.step();
+  return results.cpu;
+}
+
+
+/* Memory (chunked) */
+async function memoryBenchmark(progress){
+  if (abortRequested) { setInner('memScore','Aborted'); updateBar('memProgress',0); progress.step(); return null; }
+  const size = 100_000_000;
+  const chunk = 1e6;
+  const arr = new Float32Array(size);
+  let i = 0;
+  const start = performance.now();
+  while(i < size){
+    if (abortRequested){ setInner('memScore','Aborted'); updateBar('memProgress', (i/size)*100 ); progress.step(); return null; }
+    const end = Math.min(i+chunk,size);
+    for(; i<end; i++) arr[i] = Math.random();
+    updateBar('memProgress', (i/size)*100 );
+    await sleep(0);
+  }
+  const duration = (performance.now() - start) / 1000;
+  const mbWritten = (size * 4) / (1024*1024);
+  const bw = (mbWritten / duration).toFixed(2); // MB/s
+  results.memory = { bandwidthMBps: Number(bw), durationSec: Number(duration) };
+  setInner('memScore', bw);
+  new Chart(document.getElementById('memChart'), { type:'bar', data:{ labels:['Memory MB/s'], datasets:[{ label:'MB/s', data:[bw], backgroundColor:'#00ccff' }] }});
+  progress.step();
+  return results.memory;
+}
+
+/* GPU benchmark with live FPS chart and abortable rAF */
+async function gpuBenchmark(progress){
+  if (abortRequested) { setInner('gpuScore','Aborted'); updateBar('gpuProgress',0); progress.step(); return null; }
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+  if (!gl){ setInner('gpuScore','N/A'); updateBar('gpuProgress',100); progress.step(); return null; }
+
+  const chartCanvas = document.getElementById('gpuChart');
+  // prepare line chart to show small FPS samples
+  const fpsData = []; const labels = [];
+  const fpsChart = new Chart(chartCanvas, {
+    type: 'line',
+    data: { labels, datasets: [{ label:'FPS', data: fpsData, borderColor:'#ff33cc', fill:false }] },
+    options: { animation:false, scales:{ x:{ display:false } } }
+  });
+
+  let frames = 0;
+  let segmentStart = performance.now();
+  const startTS = performance.now();
+  let elapsedTotal = 0;
+
+  return new Promise(resolve => {
+    function frame(){
+      if (abortRequested){
+        cancelAnimationFrame(gpuAnimationHandle);
+        setInner('gpuScore','Aborted');
+        updateBar('gpuProgress', (elapsedTotal/3000)*100 );
+        progress.step();
+        resolve(null);
+        return;
+      }
+      // clear with random color (simple stress)
+      gl.clearColor(Math.random(),Math.random(),Math.random(),1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      frames++;
+      const now = performance.now();
+      const segElapsed = now - segmentStart;
+      elapsedTotal = now - startTS;
+      // update sample every 300-400ms
+      if (segElapsed >= 350){
+        const fps = (frames / (segElapsed/1000)).toFixed(2);
+        fpsData.push(Number(fps)); labels.push(labels.length+1);
+        if(fpsData.length>20){ fpsData.shift(); labels.shift(); }
+        fpsChart.update('none');
+        frames = 0;
+        segmentStart = now;
+      }
+      updateBar('gpuProgress', Math.min(100, (elapsedTotal/3000)*100 ));
+      if (elapsedTotal < 3000){
+        gpuAnimationHandle = requestAnimationFrame(frame);
+      } else {
+        // final FPS: last sample
+        const finalFPS = fpsData.length? fpsData[fpsData.length-1] : 0;
+        setInner('gpuScore', finalFPS || '0');
+        updateBar('gpuProgress',100);
+        results.gpu = { fpsSamples: fpsData.slice(), finalFPS: Number(finalFPS), durationSec: (performance.now()-startTS)/1000 };
+        progress.step();
+        resolve(results.gpu);
+      }
+    }
+    gpuAnimationHandle = requestAnimationFrame(frame);
+  });
+}
+
+/* Storage (localStorage quick test) */
+async function storageBenchmark(progress){
+  if (abortRequested) { setInner('storageScore','Aborted'); updateBar('storageProgress',0); progress.step(); return null; }
+  try {
+    const key = 'bench_test_blob';
+    // write ~10MB (JSON expands bytes, but it's ok as a relative test)
+    const arr = new Uint8Array(1_000_000);
+    const start = performance.now();
+    localStorage.setItem(key, JSON.stringify([...arr]));
+    const duration = (performance.now() - start) / 1000;
+    localStorage.removeItem(key);
+    const speed = (10 / duration).toFixed(2);
+    results.storage = { mbps: Number(speed), durationSec: Number(duration) };
+    setInner('storageScore', speed);
+    new Chart(document.getElementById('storageChart'), { type:'bar', data:{ labels:['Storage MB/s'], datasets:[{ label:'MB/s', data:[speed], backgroundColor:'#1db954' }] }});
+    updateBar('storageProgress',100);
+    progress.step();
+    return results.storage;
+  } catch(e){
+    setInner('storageScore','Error');
+    updateBar('storageProgress',0);
+    progress.step();
+    return null;
+  }
+}
+
+/* Network latency (uses AbortController to allow abortion) */
+async function networkBenchmark(progress){
+  if (abortRequested) { setInner('pingScore','Aborted'); updateBar('pingProgress',0); progress.step(); return null; }
+  const url = "https://cors-anywhere.herokuapp.com/https://www.google.com";
+  const pings = [];
+  networkAbortController = new AbortController();
+  for (let i=0;i<5;i++){
+    if (abortRequested) { networkAbortController.abort(); setInner('pingScore','Aborted'); updateBar('pingProgress',((i)/5)*100); progress.step(); return null; }
+    const start = performance.now();
+    try {
+      await fetch(url, { mode:'no-cors', signal: networkAbortController.signal });
+    } catch(e){
+      // fetch might throw due to no-cors or abort; we still measure time
+    }
+    const end = performance.now();
+    pings.push(end-start);
+    updateBar('pingProgress', ((i+1)/5)*100 );
+    await sleep(50);
+  }
+  const avg = Math.round(pings.reduce((a,b)=>a+b,0)/pings.length);
+  results.network = { avgPingMs: avg, samples: pings.slice() };
+  setInner('pingScore', avg);
+  new Chart(document.getElementById('pingChart'), { type:'bar', data:{ labels:['Ping ms'], datasets:[{ label:'ms', data:[avg], backgroundColor:'#ff3333' }] }});
+  progress.step();
+  return results.network;
+}
+
+/* ---------- Orchestration / Runner ---------- */
+async function runSelectedTests(){
+  // reset state
+  abortRequested = false;
+  networkAbortController = null;
+  results = createEmptyResults();
+  results.meta.startedAt = new Date().toISOString();
+
+  // get selections
+  const testsToRun = {
+    system: document.getElementById('chkSystem').checked,
+    cpu: document.getElementById('chkCPU').checked,
+    memory: document.getElementById('chkMemory').checked,
+    gpu: document.getElementById('chkGPU').checked,
+    storage: document.getElementById('chkStorage').checked,
+    network: document.getElementById('chkNetwork').checked
+  };
+  results.meta.selectedTests = testsToRun;
+
+  // count total
+  const keys = Object.keys(testsToRun).filter(k=>testsToRun[k]);
+  const total = keys.length;
+  if (total === 0){
+    alert('Please select at least one test.');
+    return;
+  }
+  const progress = new Progress(total);
+
+  // enable stop button
+  document.getElementById('stopBtn').disabled = false;
+  running = true;
+
+  // system info immediately (not heavy)
+  if (testsToRun.system){
+    const sys = getSystemInfo();
+    results.system = sys;
+    displaySystemInfoToUI(sys);
+    progress.step();
+  } else {
+    document.getElementById('systemInfo').innerHTML = '<em>System info disabled</em>';
+  }
+
+  // CPU
+  if (testsToRun.cpu && !abortRequested){
+    await cpuBenchmark(progress);
+  }
+
+  // Memory
+  if (testsToRun.memory && !abortRequested){
+    await memoryBenchmark(progress);
+  }
+
+  // GPU
+  if (testsToRun.gpu && !abortRequested){
+    await gpuBenchmark(progress);
+  }
+
+  // Storage
+  if (testsToRun.storage && !abortRequested){
+    await storageBenchmark(progress);
+  }
+
+  // Network
+  if (testsToRun.network && !abortRequested){
+    await networkBenchmark(progress);
+  }
+
+  // finalize
+  results.meta.endedAt = new Date().toISOString();
+  results.meta.aborted = !!abortRequested;
+
+  // compute overall if we have numeric pieces (treat null as zero)
+  const cpuVal = results.cpu?.score || 0;
+  const memVal = results.memory?.bandwidthMBps || 0;
+  const gpuVal = results.gpu?.finalFPS || 0;
+  const storageVal = results.storage?.mbps || 0;
+  const pingVal = results.network?.avgPingMs || 0;
+  const overallScore = (cpuVal*0.3 + memVal*0.2 + gpuVal*0.2 + storageVal*0.2 - pingVal*0.1).toFixed(2);
+  setInner('overallScore', overallScore);
+  results.overall = { score: Number(overallScore) };
+
+  // enable report download
+  document.getElementById('downloadJson').disabled = false;
+  document.getElementById('downloadCsv').disabled = false;
+  document.getElementById('reportButtons').removeAttribute('aria-hidden');
+
+  // cleanup run state
+  running = false;
+  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('startBtn').innerText = 'Restart Benchmark';
+}
+
+/* ---------- Stop handler ---------- */
+function stopRun(){
+  if (!running) return;
+  abortRequested = true;
+  // abort network fetch if present
+  if (networkAbortController) {
+    try { networkAbortController.abort(); } catch(e){}
+  }
+  // cancel GPU animation
+  if (gpuAnimationHandle) {
+    try { cancelAnimationFrame(gpuAnimationHandle); } catch(e){}
+    gpuAnimationHandle = null;
+  }
+  // set UI state
+  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('startBtn').innerText = 'Restart Benchmark';
+  // results.meta.aborted set later in runner
+}
+
+/* ---------- Report Export ---------- */
+function downloadJSON(){
+  const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `benchmark-${(new Date()).toISOString()}.json`; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function downloadCSV(){
+  // flatten results to simple rows: test, value, unit, duration, status
+  const rows = [['test','value','unit','duration_sec','status']];
+  function pushRow(name, obj, unit){
+    if (obj === null || obj === undefined) { rows.push([name,'','', '', 'no-data']); return; }
+    if (typeof obj === 'number' || typeof obj === 'string') {
+      rows.push([name, String(obj), unit||'', '', 'ok']);
+      return;
+    }
+    // object expected structure
+    const value = obj.score ?? obj.bandwidthMBps ?? obj.mbps ?? obj.finalFPS ?? obj.avgPingMs ?? '';
+    const dur = obj.durationSec ?? '';
+    rows.push([name, String(value), unit||'', String(dur), 'ok']);
+  }
+  pushRow('system', results.system, '');
+  pushRow('cpu', results.cpu, 'score');
+  pushRow('memory', results.memory, 'MB/s');
+  pushRow('gpu', results.gpu, 'FPS');
+  pushRow('storage', results.storage, 'MB/s');
+  pushRow('network', results.network, 'ms');
+  rows.push(['overall', results.overall?.score ?? '', '', '', results.meta.aborted ? 'aborted' : 'complete']);
+  // build csv
+  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `benchmark-${(new Date()).toISOString()}.csv`; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- Wiring UI ---------- */
+document.getElementById('startBtn').addEventListener('click', async () => {
+  if (running) return;
+  // reset per-card displays & charts
+  ['cpu','mem','gpu','storage','ping'].forEach(id => {
+    document.getElementById(id + 'Score')?.innerText && setInner(id + 'Score','-');
+    updateBar(id + 'Progress', 0);
+    const chartEl = document.getElementById(id + 'Chart');
+    if(chartEl && chartEl._chart) { try { chartEl._chart.destroy(); } catch(e){} }
+  });
+  // disable start, enable stop
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+  updateBar('progress-bar', 0);
+  document.getElementById('downloadJson').disabled = true;
+  document.getElementById('downloadCsv').disabled = true;
+  document.getElementById('reportButtons').setAttribute('aria-hidden','true');
+  // run
+  await runSelectedTests();
+});
+
+document.getElementById('stopBtn').addEventListener('click', () => {
+  stopRun();
+});
+
+/* download handlers */
+document.getElementById('downloadJson').addEventListener('click', downloadJSON);
+document.getElementById('downloadCsv').addEventListener('click', downloadCSV);
+
+/* display initial system info if checkbox checked */
+if (document.getElementById('chkSystem').checked){
+  displaySystemInfoToUI(getSystemInfo());
+}
+</script>
+</body>
+</html>
+
