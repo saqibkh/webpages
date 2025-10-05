@@ -7,8 +7,9 @@
 <style>
   body {
     display: flex;
-    justify-content: center;
-    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
     min-height: 100vh;
     background: linear-gradient(135deg, #4CAF50, #81C784);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -65,6 +66,23 @@
   .buttons .clear:hover { background: #e53935; }
   .result-container { font-family: monospace; background:#f3f3f3; border-radius:8px; padding:10px; }
   .result-container div { margin: 5px 0; }
+
+  /* --- Subtle sponsor footer --- */
+  footer {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+  }
+  footer a {
+    color: rgba(255,255,255,0.9);
+    text-decoration: none;
+    transition: color 0.3s;
+  }
+  footer a:hover {
+    color: #fff;
+    text-decoration: underline;
+  }
 </style>
 </head>
 <body>
@@ -93,6 +111,13 @@
     <div>BIN: <span id="res-bin"></span></div>
   </div>
 </div>
+
+<!-- Subtle GitHub Sponsor link -->
+<footer>
+  <a href="https://github.com/sponsors/saqibkh" target="_blank">
+    ❤️ Sponsor this project on GitHub
+  </a>
+</footer>
 
 <script>
 const display = document.getElementById("display");
