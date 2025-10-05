@@ -69,13 +69,16 @@
 
   /* --- Subtle sponsor footer --- */
   footer {
+    position: absolute;
+    bottom: 10px;
+    width: 100%;
     text-align: center;
-    margin-top: 25px;
-    font-size: 13px;
-    color: rgba(255,255,255,0.8);
+    font-size: 14px;
+    color: rgba(255,255,255,0.7);
+    z-index: 50;
   }
   footer a {
-    color: rgba(255,255,255,0.9);
+    color: rgba(255,255,255,0.85);
     text-decoration: none;
     transition: color 0.3s;
   }
@@ -83,6 +86,7 @@
     color: #fff;
     text-decoration: underline;
   }
+
 </style>
 </head>
 <body>
@@ -152,10 +156,21 @@ function generateButtons(mode){
 }
 
 function append(val){
-  if(val==="C") display.value="";
-  else display.value += val;
-
   const mode = modeSelector.value;
+
+  if(val==="C") {
+    display.value="";
+    if(mode==="programming") resultContainer.style.display="none";
+    return;
+  }
+  if(val==="=") {
+    if(mode==="normal") calculateNormal();
+    else calculate();
+    return;
+  }
+
+  display.value += val;
+
   if(mode==="scientific" || mode==="programming") calculate(); // live update only for these
 }
 
@@ -166,8 +181,12 @@ function calculate(){
     if(!val) return;
 
     if(mode==="scientific"){
-      let expr = val.replace(/sin/g,"Math.sin").replace(/cos/g,"Math.cos").replace(/tan/g,"Math.tan")
-        .replace(/log/g,"Math.log10").replace(/√/g,"Math.sqrt").replace(/\^/g,"**");
+      let expr = val.replace(/sin/g,"Math.sin")
+                    .replace(/cos/g,"Math.cos")
+                    .replace(/tan/g,"Math.tan")
+                    .replace(/log/g,"Math.log10")
+                    .replace(/√/g,"Math.sqrt")
+                    .replace(/\^/g,"**");
       display.value = eval(expr);
     } else if(mode==="programming"){
       const base = baseSelector.value;
@@ -187,36 +206,33 @@ function calculate(){
       resBin.textContent = result.toString(2);
       resultContainer.style.display="block";
     }
-  } catch { /* ignore incomplete inputs */ }
+  } catch { display.value="Error"; }
 }
 
-// Normal calculator only calculates on "=" or Enter
+// Normal calculator evaluation
 function calculateNormal() {
-  try { display.value = eval(display.value); }
-  catch { display.value="Error"; }
+  try {
+    display.value = eval(display.value);
+  } catch {
+    display.value="Error";
+  }
 }
 
 // Keyboard support
 document.addEventListener("keydown", function(event){
-  const key = event.key.toUpperCase();
+  const key = event.key;
   const mode = modeSelector.value;
 
-  if(key==="ENTER") { event.preventDefault(); if(mode==="normal") calculateNormal(); return; }
-  if(key==="ESCAPE" || key==="C") { display.value=""; if(mode==="programming") resultContainer.style.display="none"; return; }
-  if(key==="BACKSPACE") { display.value=display.value.slice(0,-1); if(mode==="scientific"||mode==="programming") calculate(); return; }
+  if(key==="Enter") { event.preventDefault(); if(mode==="normal") calculateNormal(); else calculate(); return; }
+  if(key==="Escape") { display.value=""; if(mode==="programming") resultContainer.style.display="none"; return; }
+  if(key==="Backspace") { display.value=display.value.slice(0,-1); if(mode!=="normal") calculate(); return; }
 
   if(mode==="normal"){
     if(!isNaN(key) || ["+","-","*","/","."].includes(key)) append(key);
   } else if(mode==="scientific"){
     if(!isNaN(key) || ["+","-","*","/","(",")","."].includes(key)) append(key);
-    else if(key==="S") append("sin");
-    else if(key==="C") append("cos");
-    else if(key==="T") append("tan");
-    else if(key==="L") append("log");
-    else if(key==="R") append("√");
-    else if(key==="^") append("^");
   } else if(mode==="programming"){
-    if(!isNaN(key) || ["A","B","C","D","E","F","+","-","*","/"].includes(key)) append(key);
+    if(!isNaN(key) || ["A","B","C","D","E","F","+","-","*","/"].includes(key.toUpperCase())) append(key.toUpperCase());
   }
 });
 
