@@ -70,20 +70,26 @@
   /* --- Subtle sponsor footer --- */
   footer {
     position: absolute;
-    bottom: 10px;
+    bottom: 0;
     width: 100%;
     text-align: center;
     font-size: 14px;
-    color: rgba(255,255,255,0.7);
-    z-index: 50;
-  }
-  footer a {
     color: rgba(255,255,255,0.85);
-    text-decoration: none;
-    transition: color 0.3s;
+    z-index: 50;
+    background: linear-gradient(135deg, #4CAF50, #81C784); /* match main background */
+    padding: 12px 0;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
   }
-  footer a:hover {
+
+  footer a {
     color: #fff;
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity 0.3s, text-decoration 0.3s;
+  }
+
+  footer a:hover {
+    opacity: 0.9;
     text-decoration: underline;
   }
 
