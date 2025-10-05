@@ -17,13 +17,61 @@
   #progress-bar { height:100%; width:0%; background:#1db954; text-align:center; line-height:24px; transition:width .2s ease; }
   #results { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:18px; padding:18px; }
   .card { background:#1e1e1e; border-radius:12px; padding:16px; box-shadow:0 6px 18px rgba(0,0,0,0.35); }
-  .card h2 { margin:0 0 8px 0; color:#1db954; }
+  .card h2 { margin:0 0 8px 0; color:#1db954; display:flex; align-items:center; flex-wrap:wrap; }
   .card p { margin:6px 0; font-size:0.95rem; }
   .progress-container-inner { width:100%; height:14px; background:#333; border-radius:8px; overflow:hidden; margin-top:8px; }
   .progress-bar-inner { height:100%; width:0%; background:#1db954; text-align:center; line-height:14px; font-size:11px; transition:width .08s linear; }
   canvas { width:100% !important; height:140px !important; margin-top:12px; }
   #reportButtons { display:flex; gap:10px; justify-content:center; padding:12px; }
   .note { text-align:center; font-size:0.9rem; color:#bfbfbf; padding-bottom:8px; }
+
+  /* Circular info icon with tooltip */
+  .info-icon {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: #1db954;
+    color: #121212;
+    font-weight: bold;
+    font-size: 12px;
+    margin-left: 8px;
+    position: relative;
+    cursor: pointer;
+  }
+  .info-icon:hover .tooltip-text { visibility: visible; opacity: 1; }
+  .tooltip-text {
+    visibility: hidden;
+    width: 220px;
+    background-color: #333;
+    color: #fff;
+    text-align: left;
+    padding: 6px 10px;
+    border-radius: 6px;
+    position: absolute;
+    z-index: 100;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    pointer-events: none;
+  }
+  .tooltip-text::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+  }
+
   @media (max-width:520px){ canvas{height:180px !important;} h1{font-size:1.4rem;} }
 </style>
 </head>
@@ -51,47 +99,82 @@
 
 <div id="results">
   <div class="card" id="systemInfoCard">
-    <h2>System Information</h2>
+    <h2>
+      System Information
+      <span class="info-icon">i
+        <span class="tooltip-text">Displays CPU cores, RAM, GPU, platform, and browser/OS info.</span>
+      </span>
+    </h2>
     <div id="systemInfo"><em>Not displayed until run (or enable System Info).</em></div>
   </div>
 
   <div class="card">
-    <h2>CPU Performance</h2>
+    <h2>
+      CPU Performance
+      <span class="info-icon">i
+        <span class="tooltip-text">Performs intensive math calculations to measure CPU performance.</span>
+      </span>
+    </h2>
     <p>Score: <strong id="cpuScore">-</strong></p>
     <div class="progress-container-inner"><div id="cpuProgress" class="progress-bar-inner">0%</div></div>
     <canvas id="cpuChart"></canvas>
   </div>
 
   <div class="card">
-    <h2>Memory Performance</h2>
+    <h2>
+      Memory Performance
+      <span class="info-icon">i
+        <span class="tooltip-text">Measures memory bandwidth by writing/reading large arrays.</span>
+      </span>
+    </h2>
     <p>Bandwidth: <strong id="memScore">-</strong> MB/s</p>
     <div class="progress-container-inner"><div id="memProgress" class="progress-bar-inner">0%</div></div>
     <canvas id="memChart"></canvas>
   </div>
 
   <div class="card">
-    <h2>GPU / WebGL Stress (Live FPS)</h2>
+    <h2>
+      GPU / WebGL Stress (Live FPS)
+      <span class="info-icon">i
+        <span class="tooltip-text">Runs WebGL stress test and tracks FPS to gauge GPU performance.</span>
+      </span>
+    </h2>
     <p>FPS: <strong id="gpuScore">-</strong></p>
     <div class="progress-container-inner"><div id="gpuProgress" class="progress-bar-inner">0%</div></div>
     <canvas id="gpuChart"></canvas>
   </div>
 
   <div class="card">
-    <h2>Storage Performance</h2>
+    <h2>
+      Storage Performance
+      <span class="info-icon">i
+        <span class="tooltip-text">Writes and reads data to browser storage to check storage speed.</span>
+      </span>
+    </h2>
     <p>Write Speed: <strong id="storageScore">-</strong> MB/s</p>
     <div class="progress-container-inner"><div id="storageProgress" class="progress-bar-inner">0%</div></div>
     <canvas id="storageChart"></canvas>
   </div>
 
   <div class="card">
-    <h2>Network Latency</h2>
+    <h2>
+      Network Latency
+      <span class="info-icon">i
+        <span class="tooltip-text">Measures network latency by pinging a server multiple times.</span>
+      </span>
+    </h2>
     <p>Ping: <strong id="pingScore">-</strong> ms</p>
     <div class="progress-container-inner"><div id="pingProgress" class="progress-bar-inner">0%</div></div>
     <canvas id="pingChart"></canvas>
   </div>
 
   <div class="card">
-    <h2>Overall PC Score</h2>
+    <h2>
+      Overall PC Score
+      <span class="info-icon">i
+        <span class="tooltip-text">Aggregates all test scores into a single overall PC score.</span>
+      </span>
+    </h2>
     <p>Score: <strong id="overallScore">-</strong></p>
   </div>
 </div>
