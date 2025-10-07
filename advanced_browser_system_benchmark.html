@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Advanced Browser System Benchmark — Stop & Report</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; background:#121212; color:#f4f4f9; }
+  header { padding:18px; text-align:center; }
+  h1 { margin:0; color:#1db954; font-size:1.8rem; }
+  #controls { display:flex; gap:10px; justify-content:center; padding:14px; flex-wrap:wrap; }
+  button { padding:10px 18px; font-size:15px; border:0; border-radius:8px; cursor:pointer; background:#1db954; color:#fff; }
+  button.secondary { background:#2b2b2b; }
+  #testSelection { width:90%; margin:8px auto; display:flex; flex-wrap:wrap; gap:12px; justify-content:center; }
+  #progress-container { width:90%; height:24px; background:#333; border-radius:12px; margin:8px auto; overflow:hidden; }
+  #progress-bar { height:100%; width:0%; background:#1db954; text-align:center; line-height:24px; transition:width .2s ease; }
+  #results { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:18px; padding:18px; }
+  .card { background:#1e1e1e; border-radius:12px; padding:16px; box-shadow:0 6px 18px rgba(0,0,0,0.35); }
+  .card h2 { margin:0 0 8px 0; color:#1db954; display:flex; align-items:center; flex-wrap:wrap; }
+  .card p { margin:6px 0; font-size:0.95rem; }
+  .progress-container-inner { width:100%; height:14px; background:#333; border-radius:8px; overflow:hidden; margin-top:8px; }
+  .progress-bar-inner { height:100%; width:0%; background:#1db954; text-align:center; line-height:14px; font-size:11px; transition:width .08s linear; }
+  canvas { width:100% !important; height:140px !important; margin-top:12px; }
+  #reportButtons { display:flex; gap:10px; justify-content:center; padding:12px; }
+  .note { text-align:center; font-size:0.9rem; color:#bfbfbf; padding-bottom:8px; }
+
+  .info-icon {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: #1db954;
+    color: #121212;
+    font-weight: bold;
+    font-size: 12px;
+    margin-left: 8px;
+    position: relative;
+    cursor: pointer;
+  }
+  .info-icon:hover .tooltip-text { visibility: visible; opacity: 1; }
+  .tooltip-text {
+    visibility: hidden;
+    width: 260px;
+    background-color: #333;
+    color: #fff;
+    text-align: left;
+    padding: 6px 10px;
+    border-radius: 6px;
+    position: absolute;
+    z-index: 100;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    pointer-events: none;
+  }
+  .tooltip-text::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 6px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+  }
+
+  @media (max-width:520px){ canvas{height:180px !important;} h1{font-size:1.4rem;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Advanced Browser System Benchmark</h1>
+  <div class="note">Choose tests, press <strong>Start Benchmark</strong>. You can Stop mid-run. Download results as JSON/CSV when finished.</div>
+</header>
+
+<div id="testSelection" aria-hidden="false">
+  <label><input type="checkbox" id="chkSystem" checked> System Info</label>
+  <label><input type="checkbox" id="chkCPU" checked> CPU</label>
+  <label><input type="checkbox" id="chkMemory" checked> Memory</label>
+  <label><input type="checkbox" id="chkGPU" checked> GPU</label>
+  <label><input type="checkbox" id="chkStorage" checked> Storage</label>
+  <label><input type="checkbox" id="chkNetwork" checked> Network</label>
+  <label><input type="checkbox" id="chkBattery" checked> Battery & Performance</label>
+</div>
+
+<div id="controls">
+  <button id="startBtn">Start Benchmark</button>
+  <button id="stopBtn" class="secondary" disabled>Stop</button>
+</div>
+
+<div id="progress-container"><div id="progress-bar">0%</div></div>
+
+<div id="results">
+  <div class="card" id="systemInfoCard">
+    <h2>
+      System Information
+      <span class="info-icon">i
+        <span class="tooltip-text">Displays CPU cores, RAM, GPU, platform, and browser/OS info (what the browser exposes).</span>
+      </span>
+    </h2>
+    <div id="systemInfo"><em>Not displayed until run (or enable System Info).</em></div>
+  </div>
+
+  <div class="card">
+    <h2>
+      CPU Performance
+      <span class="info-icon">i
+        <span class="tooltip-text">Performs a large number of floating-point math operations and measures operations/sec. Higher is better.</span>
+      </span>
+    </h2>
+    <p>Score: <strong id="cpuScore">-</strong></p>
+    <div class="progress-container-inner"><div id="cpuProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="cpuChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>
+      Memory Performance
+      <span class="info-icon">i
+        <span class="tooltip-text">Measures memory bandwidth by writing and reading large typed arrays in chunks.</span>
+      </span>
+    </h2>
+    <p>Bandwidth: <strong id="memScore">-</strong> MB/s</p>
+    <div class="progress-container-inner"><div id="memProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="memChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>
+      GPU / WebGL Stress (Live FPS)
+      <span class="info-icon">i
+        <span class="tooltip-text">Runs a short WebGL animation and samples FPS to estimate GPU performance.</span>
+      </span>
+    </h2>
+    <p>FPS: <strong id="gpuScore">-</strong></p>
+    <div class="progress-container-inner"><div id="gpuProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="gpuChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>
+      Storage Performance
+      <span class="info-icon">i
+        <span class="tooltip-text">Performs quick write/read to localStorage as a relative storage speed indicator.</span>
+      </span>
+    </h2>
+    <p>Write Speed: <strong id="storageScore">-</strong> MB/s</p>
+    <div class="progress-container-inner"><div id="storageProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="storageChart"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>
+      Network Performance
+      <span class="info-icon">i
+        <span class="tooltip-text">Measures ping (HEAD requests) and download speed (fetches a small test file). Upload is not reliably measurable in-browser.</span>
+      </span>
+    </h2>
+    <p>Ping: <strong id="pingScore">-</strong> ms</p>
+    <p>Download: <strong id="downloadSpeed">-</strong> Mbps</p>
+    <p>Upload: <strong id="uploadSpeed">N/A</strong></p>
+    <div class="progress-container-inner"><div id="pingProgress" class="progress-bar-inner">0%</div></div>
+    <canvas id="pingChart"></canvas>
+  </div>
+
+  <div class="card" id="batteryCard">
+    <h2>
+      Battery & Performance
+      <span class="info-icon">i
+        <span class="tooltip-text">Shows battery level, charging status, estimated times, and a performance hint based on CPU/GPU results.</span>
+      </span>
+    </h2>
+    <p>Battery Level: <strong id="batteryLevel">-</strong></p>
+    <p>Charging: <strong id="batteryCharging">-</strong></p>
+    <p>Time to Full / Empty: <strong id="batteryTime">-</strong></p>
+    <p>Performance Status: <strong id="perfStatus">-</strong></p>
+  </div>
+
+  <div class="card">
+    <h2>
+      Overall PC Score
+      <span class="info-icon">i
+        <span class="tooltip-text">Aggregates test results into one simple score. Higher is better.</span>
+      </span>
+    </h2>
+    <p>Score: <strong id="overallScore">-</strong></p>
+  </div>
+</div>
+
+<div id="reportButtons" aria-hidden="true">
+  <button id="downloadJson" class="secondary" disabled>Download JSON</button>
+  <button id="downloadCsv" class="secondary" disabled>Download CSV</button>
+</div>
+
+<script>
+/* ---------- Utilities ---------- */
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function setInner(id, txt){ const e=document.getElementById(id); if(e) e.innerText = txt; }
+function updateBar(id, pct){ const e=document.getElementById(id); if(!e) return; e.style.width = Math.max(0,Math.min(100,pct)) + '%'; e.innerText = Math.round(Math.max(0,Math.min(100,pct))) + '%'; }
+
+/* ---------- State ---------- */
+let abortRequested = false;
+let running = false;
+let networkAbortController = null;
+let gpuAnimationHandle = null;
+
+/* ---------- Chart registry for clean destroy on restart ---------- */
+const chartRegistry = {};
+function destroyChart(id){
+  const c = chartRegistry[id];
+  if(c){ try{ c.destroy(); } catch(e){} chartRegistry[id] = null; }
+}
+
+/* ---------- Results ---------- */
+function createEmptyResults() {
+  return {
+    meta: { startedAt: null, endedAt: null, aborted: false, selectedTests: {} },
+    system: null, cpu: null, memory: null, gpu: null, storage: null, network: null, battery: null, overall: null
+  };
+}
+let results = createEmptyResults();
+
+/* ---------- System Info ---------- */
+function getCPUModel(){
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  let cpuModel = 'Unknown';
+  const patterns = [/(AMD Ryzen [^\s;]+)/i, /(Intel(?: Core)? [^\s;]+)/i, /(AMD [^\s;]+)/i, /(Intel [^\s;]+)/i];
+  for (const regex of patterns){ const m = ua.match(regex); if(m){ cpuModel = m[0]; break; } }
+  if(cpuModel === 'Unknown' && /Win/i.test(platform)) cpuModel = 'x86 (Windows)';
+  if(cpuModel === 'Unknown' && /Mac/i.test(platform)) cpuModel = 'Apple Silicon or Intel (Mac)';
+  if(cpuModel === 'Unknown' && /Linux/i.test(platform)) cpuModel = 'x86_64 (Linux)';
+  return cpuModel;
+}
+function getSystemInfo(){
+  const cores = navigator.hardwareConcurrency || 'Unknown';
+  const ram = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'Unknown';
+  const platform = navigator.platform || 'Unknown';
+  const ua = navigator.userAgent || '';
+  const cpuModel = getCPUModel();
+  let canvas = document.createElement('canvas');
+  let gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  let gpu = 'Unknown';
+  if(gl){
+    const debug = gl.getExtension('WEBGL_debug_renderer_info');
+    if(debug){
+      const renderer = gl.getParameter(debug.UNMASKED_RENDERER_WEBGL);
+      const vendor = gl.getParameter(debug.UNMASKED_VENDOR_WEBGL);
+      gpu = `${renderer} (${vendor})`;
+    } else {
+      gpu = gl.getParameter(gl.RENDERER) || 'Unknown';
+    }
+  }
+  return { cpuModel, cpuCores: cores, logicalProcessors: cores, ram, platform, gpu, userAgent: ua };
+}
+function displaySystemInfoToUI(sys){
+  const c = document.getElementById('systemInfo');
+  c.innerHTML = `
+    <p><strong>CPU Model:</strong> ${sys.cpuModel}</p>
+    <p><strong>Cores:</strong> ${sys.cpuCores}</p>
+    <p><strong>Logical Processors:</strong> ${sys.logicalProcessors}</p>
+    <p><strong>RAM:</strong> ${sys.ram}</p>
+    <p><strong>Platform:</strong> ${sys.platform}</p>
+    <p><strong>GPU:</strong> ${sys.gpu}</p>
+    <p style="word-break:break-word"><strong>Browser / OS:</strong> ${sys.userAgent}</p>
+  `;
+}
+
+/* ---------- Benchmarks (simplified non-blocking) ---------- */
+
+/* CPU (chunked) — calculates raw iterations/sec and a normalized score out of 100 */
+async function cpuBenchmark(progress){
+  if (abortRequested) { setInner('cpuScore','Aborted'); updateBar('cpuProgress',0); progress.step(); return null; }
+  const total = 1e8;
+  let i = 0;
+  let sum = 0;
+  const chunk = 1e6;
+  const start = performance.now();
+  while(i < total){
+    if (abortRequested){ setInner('cpuScore','Aborted'); updateBar('cpuProgress', (i/total)*100 ); progress.step(); return null; }
+    const end = Math.min(i+chunk, total);
+    for(; i < end; i++) sum += Math.sqrt(i) * Math.sin(i);
+    updateBar('cpuProgress', (i/total)*100 );
+    await sleep(0);
+  }
+  const duration = (performance.now() - start) / 1000;
+  const raw = total / duration; // iterations/sec
+
+  // Normalize against a reference and cap at 100 for readability
+  const reference = 10_000_000; // example baseline iterations/sec
+  const score100 = Math.min((raw / reference) * 100, 100).toFixed(2);
+
+  results.cpu = { rawIterationsPerSec: Number(raw), scoreOutOf100: Number(score100), durationSec: Number(duration) };
+  setInner('cpuScore', score100);
+  destroyChart('cpuChart');
+  chartRegistry['cpuChart'] = new Chart(document.getElementById('cpuChart'), {
+    type: 'bar',
+    data: { labels: ['CPU'], datasets: [{ label: 'Score /100', data: [score100], backgroundColor: '#ff9900' }] }
+  });
+  progress.step();
+  return results.cpu;
+}
+
+/* Memory (bandwidth) */
+async function memoryBenchmark(progress){
+  if (abortRequested) { setInner('memScore','Aborted'); updateBar('memProgress',0); progress.step(); return null; }
+  const size = 100_000_000;
+  const chunk = 1e6;
+  const arr = new Float32Array(size);
+  let i = 0;
+  const start = performance.now();
+  while(i < size){
+    if (abortRequested){ setInner('memScore','Aborted'); updateBar('memProgress', (i/size)*100 ); progress.step(); return null; }
+    const end = Math.min(i+chunk, size);
+    for(; i < end; i++) arr[i] = Math.random();
+    updateBar('memProgress', (i/size)*100 );
+    await sleep(0);
+  }
+  const duration = (performance.now() - start) / 1000;
+  const mb = (size * 4) / (1024 * 1024);
+  const bw = (mb / duration).toFixed(2);
+  results.memory = { bandwidthMBps: Number(bw), durationSec: Number(duration) };
+  setInner('memScore', bw);
+  destroyChart('memChart');
+  chartRegistry['memChart'] = new Chart(document.getElementById('memChart'), {
+    type: 'bar',
+    data: { labels: ['Memory MB/s'], datasets: [{ label: 'MB/s', data: [bw], backgroundColor: '#00ccff' }] }
+  });
+  progress.step();
+  return results.memory;
+}
+
+/* GPU benchmark (short) with live FPS sampling */
+async function gpuBenchmark(progress){
+  if (abortRequested) { setInner('gpuScore','Aborted'); updateBar('gpuProgress',0); progress.step(); return null; }
+  const canvas = document.createElement('canvas');
+  const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+  if (!gl){ setInner('gpuScore','N/A'); updateBar('gpuProgress',100); progress.step(); return null; }
+
+  const chartCanvas = document.getElementById('gpuChart');
+  destroyChart('gpuChart');
+
+  const fpsData = []; const labels = [];
+  const fpsChart = new Chart(chartCanvas, {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'FPS', data: fpsData, borderColor: '#ff33cc', fill:false }] },
+    options: { animation:false, scales:{ x:{ display:false } } }
+  });
+  chartRegistry['gpuChart'] = fpsChart;
+
+  let frames = 0;
+  let segmentStart = performance.now();
+  const startTS = performance.now();
+  let elapsedTotal = 0;
+
+  return new Promise(resolve => {
+    function frame(){
+      if (abortRequested){
+        cancelAnimationFrame(gpuAnimationHandle);
+        setInner('gpuScore','Aborted');
+        updateBar('gpuProgress',0);
+        progress.step();
+        resolve(null);
+        return;
+      }
+      // simple stress: clear screen with changing color
+      gl.clearColor(Math.random(), Math.random(), Math.random(), 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      frames++;
+      const now = performance.now();
+      const segElapsed = now - segmentStart;
+      elapsedTotal = now - startTS;
+      if (segElapsed >= 350){
+        const fps = (frames / (segElapsed / 1000)).toFixed(2);
+        fpsData.push(Number(fps)); labels.push(labels.length + 1);
+        if (fpsData.length > 20){ fpsData.shift(); labels.shift(); }
+        fpsChart.update('none');
+        frames = 0;
+        segmentStart = now;
+      }
+      updateBar('gpuProgress', Math.min(100, (elapsedTotal / 3000) * 100 ));
+      if (elapsedTotal < 3000){
+        gpuAnimationHandle = requestAnimationFrame(frame);
+      } else {
+        const finalFPS = fpsData.length ? fpsData[fpsData.length - 1] : 0;
+        setInner('gpuScore', finalFPS || '0');
+        updateBar('gpuProgress', 100);
+        results.gpu = { fpsSamples: fpsData.slice(), finalFPS: Number(finalFPS), durationSec: (performance.now() - startTS) / 1000 };
+        progress.step();
+        resolve(results.gpu);
+      }
+    }
+    gpuAnimationHandle = requestAnimationFrame(frame);
+  });
+}
+
+/* Storage quick test (localStorage) */
+async function storageBenchmark(progress){
+  if (abortRequested) { setInner('storageScore','Aborted'); updateBar('storageProgress',0); progress.step(); return null; }
+  try {
+    const key = 'bench_test_blob';
+    const arr = new Uint8Array(1_000_000); // ~1MB
+    const start = performance.now();
+    localStorage.setItem(key, JSON.stringify([...arr]));
+    const duration = (performance.now() - start) / 1000;
+    localStorage.removeItem(key);
+    const speed = (10 / duration).toFixed(2); // relative MB/s
+    results.storage = { mbps: Number(speed), durationSec: Number(duration) };
+    setInner('storageScore', speed);
+    destroyChart('storageChart');
+    chartRegistry['storageChart'] = new Chart(document.getElementById('storageChart'), {
+      type: 'bar',
+      data: { labels: ['Storage MB/s'], datasets: [{ label: 'MB/s', data: [speed], backgroundColor: '#1db954' }] }
+    });
+    updateBar('storageProgress', 100);
+    progress.step();
+    return results.storage;
+  } catch(e){
+    setInner('storageScore','Error');
+    updateBar('storageProgress', 0);
+    progress.step();
+    return null;
+  }
+}
+
+/* Network (ping + averaged download). Upload is N/A in browser */
+async function networkBenchmark(progress, pingRepeats = 3, downloadRepeats = 3){
+  if (abortRequested) { setInner('pingScore','Aborted'); setInner('downloadSpeed','-'); setInner('uploadSpeed','N/A'); updateBar('pingProgress',0); progress.step(); return null; }
+
+  // NOTE: using a public test file with CORS proxy — in production host your own test files with CORS support.
+  const url = "https://cors-anywhere.herokuapp.com/https://speed.hetzner.de/1MB.bin";
+  const pingSamples = [];
+  const downloadSamples = [];
+  networkAbortController = new AbortController();
+  const signal = networkAbortController.signal;
+
+  // Pings
+  for (let i = 0; i < pingRepeats; i++){
+    if (abortRequested) break;
+    const start = performance.now();
+    try { await fetch(url, { method: 'HEAD', cache: 'no-cache', signal }); } catch(e){}
+    const end = performance.now();
+    pingSamples.push(end - start);
+    updateBar('pingProgress', ((i + 1) / (pingRepeats + downloadRepeats)) * 100 );
+    await sleep(50);
+  }
+  const avgPing = Math.round(pingSamples.reduce((a,b)=>a+b,0) / pingSamples.length);
+  setInner('pingScore', avgPing);
+
+  // Download (multiple attempts, average)
+  for (let i = 0; i < downloadRepeats; i++){
+    if (abortRequested) break;
+    const start = performance.now();
+    try {
+      const resp = await fetch(url, { cache: 'no-cache', signal });
+      await resp.arrayBuffer();
+      const durationSec = (performance.now() - start) / 1000;
+      const mbps = (8 * 1024 * 1024 / 1e6 / durationSec); // 1MB file -> Mbps
+      downloadSamples.push(mbps);
+    } catch(e){
+      console.warn('Download attempt failed', e);
+    }
+    updateBar('pingProgress', ((pingRepeats + i + 1) / (pingRepeats + downloadRepeats)) * 100 );
+    await sleep(100);
+  }
+  const avgDownload = downloadSamples.length > 0 ? (downloadSamples.reduce((a,b)=>a+b,0) / downloadSamples.length).toFixed(2) : 'Error';
+  setInner('downloadSpeed', avgDownload);
+  setInner('uploadSpeed', 'N/A');
+
+  results.network = { avgPingMs: avgPing, downloadMbps: parseFloat(avgDownload) || null, uploadMbps: null, pingSamples, downloadSamples };
+
+  destroyChart('pingChart');
+  chartRegistry['pingChart'] = new Chart(document.getElementById('pingChart'), {
+    type: 'bar',
+    data: { labels: ['Ping ms','Download Mbps','Upload'], datasets: [{ label: 'Network', data: [avgPing, parseFloat(avgDownload) || 0, 0], backgroundColor: ['#ff3333','#33ccff','#ff9900'] }] }
+  });
+
+  progress.step();
+  return results.network;
+}
+
+/* ---------- Battery & Performance ---------- */
+async function getBatteryInfo(){
+  if (!navigator.getBattery) return null;
+  try {
+    const batt = await navigator.getBattery();
+    return { level: Math.round(batt.level * 100), charging: batt.charging, chargingTime: batt.chargingTime, dischargingTime: batt.dischargingTime };
+  } catch(e){ return null; }
+}
+function displayBatteryInfo(batt, perfStatus){
+  if (!batt) {
+    setInner('batteryLevel','N/A'); setInner('batteryCharging','N/A'); setInner('batteryTime','N/A'); setInner('perfStatus','Unknown');
+    return;
+  }
+  setInner('batteryLevel', batt.level + '%');
+  setInner('batteryCharging', batt.charging ? 'Yes ⚡' : 'No 🔋');
+  const timeStr = batt.charging ? (batt.chargingTime === Infinity ? 'Unknown' : `${Math.round(batt.chargingTime/60)} min to full`) : (batt.dischargingTime === Infinity ? 'Unknown' : `${Math.round(batt.dischargingTime/60)} min to empty`);
+  setInner('batteryTime', timeStr);
+  setInner('perfStatus', perfStatus || 'Stable');
+}
+function getPerformanceHint(){
+  // lightweight heuristic: if CPU raw iterations/sec is much lower than reference OR GPU FPS low -> suspect throttling
+  const cpuRaw = results.cpu?.rawIterationsPerSec || 0;
+  const gpuFPS = results.gpu?.finalFPS || 0;
+  if (cpuRaw === 0 && gpuFPS === 0) return 'Not measured yet';
+  if (cpuRaw < 0.8 * 10_000_000 || gpuFPS < 20) return 'Performance may be throttled (thermal/power limits)';
+  return 'Stable';
+}
+async function runBatteryPerformanceCheck(){
+  if (abortRequested) return;
+  const perfHint = getPerformanceHint();
+  const batt = await getBatteryInfo();
+  results.battery = batt ? { ...batt, perfHint } : null;
+  displayBatteryInfo(batt, perfHint);
+}
+
+/* ---------- Orchestration / Runner ---------- */
+async function runSelectedTests(){
+  // cleanup state from previous runs
+  abortRequested = false;
+  results = createEmptyResults();
+  results.meta.startedAt = new Date().toISOString();
+
+  // get selections
+  const testsToRun = {
+    system: document.getElementById('chkSystem').checked,
+    cpu: document.getElementById('chkCPU').checked,
+    memory: document.getElementById('chkMemory').checked,
+    gpu: document.getElementById('chkGPU').checked,
+    storage: document.getElementById('chkStorage').checked,
+    network: document.getElementById('chkNetwork').checked,
+    battery: document.getElementById('chkBattery').checked
+  };
+  results.meta.selectedTests = testsToRun;
+
+  // build total steps by counting selected tests (battery is run after performance tests)
+  const keys = Object.keys(testsToRun).filter(k => testsToRun[k] && k !== 'battery');
+  // if battery is selected, it will be run after these tests as an extra step
+  const total = keys.length + (testsToRun.battery ? 1 : 0);
+  if (total === 0){
+    alert('Please select at least one test.');
+    return;
+  }
+  const progress = new (class { constructor(total){ this.total = total; this.completed=0; } step(){ this.completed++; updateBar('progress-bar', (this.completed/this.total)*100 ); } })(total);
+
+  // enable stop button
+  document.getElementById('stopBtn').disabled = false;
+  running = true;
+
+  // system info
+  if (testsToRun.system){
+    const sys = getSystemInfo();
+    results.system = sys;
+    displaySystemInfoToUI(sys);
+    progress.step();
+  } else {
+    document.getElementById('systemInfo').innerHTML = '<em>System info disabled</em>';
+  }
+
+  // CPU
+  if (testsToRun.cpu && !abortRequested){ await cpuBenchmark(progress); }
+
+  // Memory
+  if (testsToRun.memory && !abortRequested){ await memoryBenchmark(progress); }
+
+  // GPU
+  if (testsToRun.gpu && !abortRequested){ await gpuBenchmark(progress); }
+
+  // Storage
+  if (testsToRun.storage && !abortRequested){ await storageBenchmark(progress); }
+
+  // Network
+  if (testsToRun.network && !abortRequested){ await networkBenchmark(progress); }
+
+  // Battery & Performance (runs last)
+  if (testsToRun.battery && !abortRequested){
+    await runBatteryPerformanceCheck();
+    progress.step();
+  }
+
+  // finalize
+  results.meta.endedAt = new Date().toISOString();
+  results.meta.aborted = !!abortRequested;
+
+  // compute an overall score (simple weighted)
+  const cpuScore = results.cpu?.scoreOutOf100 || 0; // 0-100
+  const memVal = results.memory?.bandwidthMBps || 0;
+  const gpuVal = results.gpu?.finalFPS || 0;
+  const storageVal = results.storage?.mbps || 0;
+  const pingVal = results.network?.avgPingMs || 0;
+
+  // normalize memory/gpu/storage to smaller scale for aggregation (simple heuristic)
+  const memNorm = Math.min(memVal / 1000 * 100, 100); // assume 1000 MB/s -> 100
+  const gpuNorm = Math.min(gpuVal / 60 * 100, 100); // assume 60 FPS -> 100
+  const storageNorm = Math.min(storageVal / 500 * 100, 100); // assume 500 MB/s -> 100
+  const pingPenalty = Math.min(pingVal / 200 * 100, 100); // higher is worse
+
+  const overall = (cpuScore * 0.35 + memNorm * 0.2 + gpuNorm * 0.2 + storageNorm * 0.15 - pingPenalty * 0.1);
+  const overallClamped = Math.max(0, Math.min(100, overall)).toFixed(2);
+  results.overall = { score: Number(overallClamped) };
+  setInner('overallScore', overallClamped);
+
+  // enable report download
+  document.getElementById('downloadJson').disabled = false;
+  document.getElementById('downloadCsv').disabled = false;
+  document.getElementById('reportButtons').removeAttribute('aria-hidden');
+
+  // cleanup
+  running = false;
+  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('startBtn').innerText = 'Restart Benchmark';
+}
+
+/* ---------- Stop / Cleanup ---------- */
+function stopRun(){
+  if (!running) return;
+  abortRequested = true;
+  // abort network fetches
+  if (networkAbortController){
+    try { networkAbortController.abort(); } catch(e) {}
+    networkAbortController = null;
+  }
+  // cancel GPU animation
+  if (gpuAnimationHandle){
+    try { cancelAnimationFrame(gpuAnimationHandle); } catch(e){}
+    gpuAnimationHandle = null;
+  }
+  // allow immediate UI reset
+  document.getElementById('stopBtn').disabled = true;
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('startBtn').innerText = 'Restart Benchmark';
+}
+
+/* ---------- Report Export ---------- */
+function downloadJSON(){
+  const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `benchmark-${(new Date()).toISOString()}.json`; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function downloadCSV(){
+  const rows = [['test','value','unit','duration_sec','status']];
+  function push(name, obj, unit){
+    if (obj === null || obj === undefined){ rows.push([name,'','', '', 'no-data']); return; }
+    if (typeof obj === 'number' || typeof obj === 'string'){ rows.push([name, String(obj), unit || '', '', 'ok']); return; }
+    const value = obj.scoreOutOf100 ?? obj.rawIterationsPerSec ?? obj.bandwidthMBps ?? obj.mbps ?? obj.finalFPS ?? obj.avgPingMs ?? '';
+    const dur = obj.durationSec ?? '';
+    rows.push([name, String(value), unit||'', String(dur), 'ok']);
+  }
+  push('system', results.system, '');
+  push('cpu', results.cpu, 'score/100');
+  push('memory', results.memory, 'MB/s');
+  push('gpu', results.gpu, 'FPS');
+  push('storage', results.storage, 'MB/s');
+  push('network', results.network, 'ms/Mbps');
+  push('battery', results.battery, '');
+  rows.push(['overall', results.overall?.score ?? '', '', '', results.meta.aborted ? 'aborted' : 'complete']);
+  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `benchmark-${(new Date()).toISOString()}.csv`; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- UI Wiring ---------- */
+document.getElementById('startBtn').addEventListener('click', async () => {
+  if (running) return;
+
+  // cleanup previous run state: cancel animations, abort pending fetches, destroy charts, reset progress
+  stopRun(); // ensure any previous run has been flagged to stop
+  Object.keys(chartRegistry).forEach(id => destroyChart(id));
+  ['cpu','mem','gpu','storage','ping'].forEach(id => { setInner(id + 'Score','-'); updateBar(id + 'Progress', 0); });
+  updateBar('progress-bar', 0);
+  document.getElementById('downloadJson').disabled = true;
+  document.getElementById('downloadCsv').disabled = true;
+  document.getElementById('reportButtons').setAttribute('aria-hidden','true');
+
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+  await runSelectedTests();
+});
+
+document.getElementById('stopBtn').addEventListener('click', () => stopRun());
+document.getElementById('downloadJson').addEventListener('click', downloadJSON);
+document.getElementById('downloadCsv').addEventListener('click', downloadCSV);
+
+/* display initial system info if checkbox checked */
+if (document.getElementById('chkSystem').checked){
+  displaySystemInfoToUI(getSystemInfo());
+}
+</script>
+</body>
+</html>
+
