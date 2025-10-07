@@ -49,7 +49,7 @@ canvas {
 
 #timer {
   position: absolute;
-  top: 70px;
+  top:100px;  /* below Level/Score display */
   width: 100%;
   text-align: center;
   color: white;
@@ -72,15 +72,19 @@ footer a {
   text-decoration: none;
   transition: color 0.3s;
 }
-footer a:hover {
-  color: #fff;
-  text-decoration: underline;
-}
+footer a:hover { color: #fff; text-decoration: underline; }
 </style>
 </head>
 <body>
 <h1>Paddle Smash</h1>
+
+<!-- Level and Score Display -->
+<div id="game-info" style="position:absolute; top:75px; width:100%; text-align:center; color:white; font-size:1.5em; z-index:5;">
+  <span id="current-level">Level: 1</span> | <span id="current-score">Score: 0</span>
+</div>
+
 <div id="timer">00:00</div>
+
 <canvas id="gameCanvas"></canvas>
 
 <!-- Score Tab -->
@@ -108,7 +112,8 @@ footer a:hover {
   <select id="level-select">
     <option value="1">1 (Slowest)</option><option value="2">2</option><option value="3">3</option>
     <option value="4">4</option><option value="5">5</option><option value="6">6</option>
-    <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+    <option value="7">7</option><option value="8">8</option>
+    <option value="9">9</option>
     <option value="10">10 (Fastest)</option>
   </select>
   <button onclick="startGame()">Start Game</button>
@@ -122,45 +127,33 @@ footer a:hover {
   <a href="https://github.com/sponsors/saqibkh" target="_blank">❤️ Support the developer on GitHub</a>
 </footer>
 
-<!-- ✅ Firebase setup -->
+<!-- Firebase setup -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-  import {
-    getFirestore, collection, addDoc, getDocs,
-    query, where, orderBy, limit
-  } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
-  // 🔧 Replace this with your Firebase project configuration:
-  const firebaseConfig = {
-    apiKey: "AIzaSyApRYbtteQa7lMkC09N2VZb2hoQLIPWB70",
-    authDomain: "paddle-smash-khansaqib.firebaseapp.com",
-    projectId: "paddle-smash-khansaqib",
-    storageBucket: "paddle-smash-khansaqib.firebasestorage.app",
-    messagingSenderId: "834494575151",
-    appId: "1:834494575151:web:abdb9dc6e1d8f84e96ccda"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyApRYbtteQa7lMkC09N2VZb2hoQLIPWB70",
+  authDomain: "paddle-smash-khansaqib.firebaseapp.com",
+  projectId: "paddle-smash-khansaqib",
+  storageBucket: "paddle-smash-khansaqib.firebasestorage.app",
+  messagingSenderId: "834494575151",
+  appId: "1:834494575151:web:abdb9dc6e1d8f84e96ccda"
+};
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-  window.saveScoreOnline = async function (level, name, score, time) {
-    await addDoc(collection(db, "scores"), { level, name, score, time, created: Date.now() });
-  };
-
-  window.getHighScores = async function (level) {
-    const q = query(
-      collection(db, "scores"),
-      where("level", "==", level),
-      orderBy("score", "desc"),
-      orderBy("time", "asc"),
-      limit(10)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data());
-  };
+window.saveScoreOnline = async (level, name, score, time) => {
+  await addDoc(collection(db,"scores"), {level,name,score,time,created:Date.now()});
+};
+window.getHighScores = async (level) => {
+  const q = query(collection(db,"scores"), where("level","==",level), orderBy("score","desc"), orderBy("time","asc"), limit(10));
+  const snap = await getDocs(q);
+  return snap.docs.map(d=>d.data());
+};
 </script>
 
-<!-- ✅ Game logic -->
 <script>
 const canvas=document.getElementById("gameCanvas");
 const ctx=canvas.getContext("2d");
@@ -172,19 +165,17 @@ const pauseOverlay=document.getElementById("pause-overlay");
 const highscoresContainer=document.getElementById("highscores-container");
 const viewLevelSelect=document.getElementById("view-level");
 const scoresDisplay=document.getElementById("scores-display");
+const currentLevelDisplay=document.getElementById("current-level");
+const currentScoreDisplay=document.getElementById("current-score");
 
 const paddleSound=document.getElementById("paddle-sound");
 const blockSound=document.getElementById("block-sound");
 
-let animationId;
-let paddle={width:100,height:12,x:0,y:0,speed:0};
-let ball={x:0,y:0,radius:10,dx:0,dy:0,released:false};
+let animationId,score=0,level=1,gameOver=false,gameWon=false,startTime=null,paused=false;
+let paddle={width:100,height:12,x:0,y:0,speed:0},ball={x:0,y:0,radius:10,dx:0,dy:0,released:false};
+let blockRows=5,blockCols=8,blockHeight=20,blockPadding=10,blockOffsetTop=30,blockOffsetLeft=35;
+let blocks=[],blockWidth,particles=[],timerInterval=null,elapsedSeconds=0;
 let baseSpeed=0;
-const blockRows=5,blockCols=8,blockHeight=20,blockPadding=10,blockOffsetTop=30,blockOffsetLeft=35;
-let blocks=[],blockWidth;
-let score=0,gameOver=false,gameWon=false,startTime=null,level=1,paused=false;
-let particles=[];
-let timerInterval=null,elapsedSeconds=0;
 
 function formatTime(seconds){const m=Math.floor(seconds/60).toString().padStart(2,'0');const s=(seconds%60).toString().padStart(2,'0');return `${m}:${s}`;}
 function startTimer(){clearInterval(timerInterval);elapsedSeconds=0;document.getElementById("timer").textContent=formatTime(elapsedSeconds);timerInterval=setInterval(()=>{elapsedSeconds++;document.getElementById("timer").textContent=formatTime(elapsedSeconds);},1000);}
@@ -194,12 +185,20 @@ function initBlocks(){blocks=[];blockWidth=(canvas.width-blockOffsetLeft*2-block
 function resizeCanvas(){canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight;paddle.y=canvas.height-25;paddle.x=canvas.width/2-paddle.width/2;if(!ball.released){ball.x=paddle.x+paddle.width/2;ball.y=paddle.y-ball.radius;}initBlocks();initParticles();}
 window.addEventListener('resize',resizeCanvas);resizeCanvas();levelOverlay.style.display="flex";
 
+// --- Update Displays ---
+function updateLevelDisplay(){document.getElementById("current-level").textContent="Level: "+level;}
+function updateScoreDisplay(){document.getElementById("current-score").textContent="Score: "+score;}
+
+// --- Start Game ---
 function startGame(){
   level=parseInt(levelSelect.value);
+  score=0;
+  updateLevelDisplay();
+  updateScoreDisplay();
   paddle.width=200*Math.pow(0.98,level-1);
   paddle.x=canvas.width/2-paddle.width/2;
   levelOverlay.style.display="none";
-  gameOver=false;gameWon=false;score=0;startTime=null;
+  gameOver=false;gameWon=false;startTime=null;
   ball.released=false;ball.dx=0;ball.dy=0;
   baseSpeed=2+level;
   cancelAnimationFrame(animationId);
@@ -209,8 +208,8 @@ function startGame(){
 
 canvas.addEventListener("mousemove",e=>{const r=canvas.getBoundingClientRect();paddle.x=e.clientX-r.left-paddle.width/2;if(paddle.x<0)paddle.x=0;if(paddle.x+paddle.width>canvas.width)paddle.x=canvas.width-paddle.width;if(!ball.released){ball.x=paddle.x+paddle.width/2;ball.y=paddle.y-ball.radius;}});
 canvas.addEventListener("click",()=>{launchBall();});
-document.addEventListener("keydown",e=>{if(e.key==="ArrowLeft")paddle.speed=-7;else if(e.key==="ArrowRight")paddle.speed=7;else if(e.key.toLowerCase()==="p"){paused=!paused;pauseOverlay.style.display=paused?"flex":"none";}else if(e.key===" "&&!ball.released&&!gameOver)launchBall();});
-document.addEventListener("keyup",e=>{if(e.key==="ArrowLeft"||e.key==="ArrowRight")paddle.speed=0;});
+document.addEventListener("keydown", e=>{if(e.key==="ArrowLeft")paddle.speed=-7;else if(e.key==="ArrowRight")paddle.speed=7;else if(e.key.toLowerCase()==="p"){paused=!paused;pauseOverlay.style.display=paused?"flex":"none";}else if(e.key===" "&&!ball.released&&!gameOver)launchBall();});
+document.addEventListener("keyup", e=>{if(e.key==="ArrowLeft"||e.key==="ArrowRight")paddle.speed=0;});
 
 function launchBall(){if(!ball.released&&!gameOver){ball.released=true;ball.dx=baseSpeed;ball.dy=-baseSpeed;if(!startTime)startTime=Date.now();startTimer();}}
 function playSound(s){s.currentTime=0;s.play();}
@@ -224,16 +223,22 @@ function draw(){
   if(paused||gameOver){animationId=requestAnimationFrame(draw);return;}
   ctx.clearRect(0,0,canvas.width,canvas.height);
   drawParticles();drawBlocks();drawPaddle();drawBallTrail();drawBall();
-  paddle.x+=paddle.speed;
-  if(paddle.x<0)paddle.x=0;if(paddle.x+paddle.width>canvas.width)paddle.x=canvas.width-paddle.width;
+  paddle.x+=paddle.speed;if(paddle.x<0)paddle.x=0;if(paddle.x+paddle.width>canvas.width)paddle.x=canvas.width-paddle.width;
   if(ball.released){
     ball.x+=ball.dx;ball.y+=ball.dy;
     if(ball.x+ball.radius>canvas.width||ball.x-ball.radius<0)ball.dx*=-1;
     if(ball.y-ball.radius<0)ball.dy*=-1;
     if(ball.dy>0&&ball.y+ball.radius>=paddle.y&&ball.y-ball.dy+ball.radius<=paddle.y+paddle.height&&ball.x+ball.radius>paddle.x&&ball.x-ball.radius<paddle.x+paddle.width){
-      ball.y=paddle.y-ball.radius;ball.dy=-Math.abs(ball.dy);playSound(paddleSound);
+      ball.y=paddle.y-ball.radius;ball.dy=-Math.abs(ball.dy);playSound(paddleSound);}
+    for(let r=0;r<blockRows;r++){
+      for(let c=0;c<blockCols;c++){
+        let b=blocks[r][c];
+        if(b.status && ball.x>b.x && ball.x<b.x+blockWidth && ball.y>b.y && ball.y<b.y+blockHeight){
+          ball.dy*=-1; b.status=0; score++; updateScoreDisplay(); playSound(blockSound);
+          if(score===blockRows*blockCols){gameWon=true;endGame();}
+        }
+      }
     }
-    for(let r=0;r<blockRows;r++){for(let c=0;c<blockCols;c++){let b=blocks[r][c];if(b.status&&ball.x>b.x&&ball.x<b.x+blockWidth&&ball.y>b.y&&ball.y<b.y+blockHeight){ball.dy*=-1;b.status=0;score++;playSound(blockSound);if(score===blockRows*blockCols){gameWon=true;endGame();}}}}
     if(ball.y-ball.dy-ball.radius>canvas.height){gameOver=true;endGame();}
   }
   animationId=requestAnimationFrame(draw);
@@ -249,13 +254,13 @@ async function endGame(){
 
 function restartGame(){overlay.style.display="none";levelOverlay.style.display="flex";document.getElementById("timer").textContent="00:00";}
 
-// --- Firebase-based High Scores ---
 async function saveScore(level,score,time){
-  const playerName = prompt("🎮 You made the top 10! Enter your name:", "Player") || "Player";
+  const playerName=prompt("🎮 You made the top 10! Enter your name:","Player")||"Player";
   await saveScoreOnline(level,playerName,score,time);
   await displayHighScores(level);
   await updateScoreTab(level);
 }
+
 async function displayHighScores(level){
   const scores = await getHighScores(level);
   if(!scores.length){highscoresContainer.innerHTML="<p>No high scores yet.</p>";return;}
@@ -263,6 +268,7 @@ async function displayHighScores(level){
   scores.forEach(s=>{html+=`<li>${s.name}: Score ${s.score} | Time: ${s.time}s</li>`;});
   html+="</ol>";highscoresContainer.innerHTML=html;
 }
+
 async function updateScoreTab(level){
   const scores = await getHighScores(level);
   if(!scores.length){scoresDisplay.innerHTML="No high scores yet.";return;}
@@ -273,11 +279,8 @@ async function updateScoreTab(level){
 
 window.onload = () => {
   updateScoreTab(parseInt(viewLevelSelect.value));
-  viewLevelSelect.addEventListener("change",async()=>{
-    await updateScoreTab(parseInt(viewLevelSelect.value));
-  });
+  viewLevelSelect.addEventListener("change", async()=>{await updateScoreTab(parseInt(viewLevelSelect.value));});
 };
-
 </script>
 </body>
 </html>
