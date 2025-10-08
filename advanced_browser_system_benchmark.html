@@ -273,40 +273,171 @@ function displaySystemInfoToUI(sys){
   `;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* ---------- Benchmarks (simplified non-blocking) ---------- */
 
 /* CPU (chunked) — calculates raw iterations/sec and a normalized score out of 100 */
 async function cpuBenchmark(progress){
   if (abortRequested) { setInner('cpuScore','Aborted'); updateBar('cpuProgress',0); progress.step(); return null; }
-  const total = 1e8;
-  let i = 0;
-  let sum = 0;
-  const chunk = 1e6;
-  const start = performance.now();
-  while(i < total){
-    if (abortRequested){ setInner('cpuScore','Aborted'); updateBar('cpuProgress', (i/total)*100 ); progress.step(); return null; }
-    const end = Math.min(i+chunk, total);
-    for(; i < end; i++) sum += Math.sqrt(i) * Math.sin(i);
-    updateBar('cpuProgress', (i/total)*100 );
-    await sleep(0);
+
+  const cores = navigator.hardwareConcurrency || 4;
+  const durationSec = 5; // Run benchmark for 5 seconds
+  const workers = [];
+  const resultsPerWorker = [];
+
+  const workerCode = `
+    self.onmessage = function(e){
+      const { durationSec } = e.data;
+
+      let floatOps = 0, intOps = 0, branchOps = 0, memOps = 0, recursionOps = 0, primeOps = 0, simdOps = 0;
+
+      const arrSize = 1e4; // balanced array size
+      const arr = new Float64Array(arrSize).map(() => Math.random());
+      const arrB = new Float64Array(arrSize).map(() => Math.random());
+      const arrC = new Float64Array(arrSize);
+
+      function fib(n){ return n<2?n:fib(n-1)+fib(n-2); }
+
+      const startTime = performance.now();
+      while((performance.now() - startTime)/1000 < durationSec){
+        for(let i=0;i<50000;i++){ // chunked loop
+          // --- FLOAT ---
+          Math.sin(i) * Math.cos(i) * Math.sqrt(i + 1);
+          Math.tan(i) + Math.log(i+1);
+          floatOps++;
+
+          // --- INTEGER ---
+          (i & 0xff) ^ ((i >> 2) | 5);
+          intOps++;
+
+          // --- BRANCH ---
+          if(i % 2 === 0){ branchOps++; } else { branchOps++; }
+
+          // --- MEMORY ---
+          const idx = i % arrSize;
+          arr[idx] = arr[idx]*1.01 + Math.sin(i);
+          memOps++;
+
+          // --- RECURSION ---
+          if(i % 1000 === 0){ fib(8); recursionOps++; }
+
+          // --- PRIME ---
+          if(i % 50 === 0){
+            let n = 2 + (i % 50);
+            let isPrime = true;
+            for(let j=2;j*j<=n;j++){ if(n%j===0){ isPrime=false; break; } }
+            if(isPrime) primeOps++;
+          }
+
+          // --- SIMD-LIKE ---
+          if(i % 1000 === 0){
+            for(let j=0;j<arrSize;j++){
+              arrC[j] = arr[j]*2.0 + arrB[j]*0.5;
+              simdOps++;
+            }
+          }
+
+          if(self.abortRequested) break;
+        }
+      }
+
+      const duration = (performance.now() - startTime)/1000;
+      self.postMessage({ duration, ops: { float: floatOps, integer: intOps, branch: branchOps, memory: memOps, recursion: recursionOps, prime: primeOps, simd: simdOps } });
+    };
+  `;
+
+  const blob = new Blob([workerCode], { type: 'application/javascript' });
+  const workerURL = URL.createObjectURL(blob);
+
+  for(let i=0;i<cores;i++){
+    const worker = new Worker(workerURL);
+    workers.push(worker);
+
+    worker.onmessage = (e) => {
+      resultsPerWorker.push(e.data);
+
+      if(resultsPerWorker.length === cores){
+        const agg = { float:0, integer:0, branch:0, memory:0, recursion:0, prime:0, simd:0 };
+        let totalDuration = 0;
+        resultsPerWorker.forEach(w => {
+          Object.keys(agg).forEach(k => { agg[k] += w.ops[k]; });
+          totalDuration += w.duration;
+        });
+
+        const avgDuration = totalDuration / cores;
+        results.cpu = { opCounts: agg, durationSec: avgDuration };
+
+        // Display counts in scientific notation with 1 decimal place
+        const c = document.getElementById('cpuScore');
+        c.innerHTML = Object.entries(agg)
+          .map(([k,v]) => `${k}: ${v.toExponential(1)}`)
+          .join('<br>');
+
+        // Draw chart with Y-axis in scientific notation
+        destroyChart('cpuChart');
+        chartRegistry['cpuChart'] = new Chart(document.getElementById('cpuChart'), {
+          type: 'bar',
+          data: {
+            labels: Object.keys(agg),
+            datasets: [{ label: 'Op Counts', data: Object.values(agg), backgroundColor:'#ff9900' }]
+          },
+          options: { 
+            scales: { 
+              y: { 
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) { return value.toExponential(1); }
+                }
+              } 
+            }
+          }
+        });
+
+        updateBar('cpuProgress',100);
+        progress.step();
+      }
+    };
+
+    worker.postMessage({ durationSec });
   }
-  const duration = (performance.now() - start) / 1000;
-  const raw = total / duration; // iterations/sec
 
-  // Normalize against a reference and cap at 100 for readability
-  const reference = 10_000_000; // example baseline iterations/sec
-  const score100 = Math.min((raw / reference) * 100, 100).toFixed(2);
-
-  results.cpu = { rawIterationsPerSec: Number(raw), scoreOutOf100: Number(score100), durationSec: Number(duration) };
-  setInner('cpuScore', score100);
-  destroyChart('cpuChart');
-  chartRegistry['cpuChart'] = new Chart(document.getElementById('cpuChart'), {
-    type: 'bar',
-    data: { labels: ['CPU'], datasets: [{ label: 'Score /100', data: [score100], backgroundColor: '#ff9900' }] }
-  });
-  progress.step();
-  return results.cpu;
+  // Abort support
+  const checkAbort = setInterval(() => {
+    if(abortRequested){
+      workers.forEach(w => w.terminate());
+      setInner('cpuScore','Aborted');
+      updateBar('cpuProgress',0);
+      progress.step();
+      clearInterval(checkAbort);
+    }
+  }, 50);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* Memory (bandwidth) */
 async function memoryBenchmark(progress){
