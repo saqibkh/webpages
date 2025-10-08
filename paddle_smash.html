@@ -200,7 +200,7 @@ function startGame(){
   levelOverlay.style.display="none";
   gameOver=false;gameWon=false;startTime=null;
   ball.released=false;ball.dx=0;ball.dy=0;
-  baseSpeed=2+level;
+  baseSpeed=3 * Math.pow(1.25, level - 1) + 2;
   cancelAnimationFrame(animationId);
   initBlocks();initParticles();
   animationId=requestAnimationFrame(draw);
