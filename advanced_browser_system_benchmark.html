@@ -278,32 +278,49 @@ function displaySystemInfoToUI(sys){
 /* CPU (chunked) — calculates raw iterations/sec and a normalized score out of 100 */
 async function cpuBenchmark(progress){
   if (abortRequested) { setInner('cpuScore','Aborted'); updateBar('cpuProgress',0); progress.step(); return null; }
-  const total = 1e8;
+
+  const total = 5e7; // total iterations
   let i = 0;
   let sum = 0;
-  const chunk = 1e6;
+  const chunk = 5e5;
   const start = performance.now();
+  const cores = navigator.hardwareConcurrency || 4; // default 4 if unknown
+
   while(i < total){
-    if (abortRequested){ setInner('cpuScore','Aborted'); updateBar('cpuProgress', (i/total)*100 ); progress.step(); return null; }
+    if (abortRequested){
+      setInner('cpuScore','Aborted');
+      updateBar('cpuProgress', (i/total)*100 );
+      progress.step();
+      return null;
+    }
     const end = Math.min(i+chunk, total);
-    for(; i < end; i++) sum += Math.sqrt(i) * Math.sin(i);
+    for(; i<end; i++){
+      sum += Math.sqrt(i) * Math.sin(i) * Math.cos(i);
+    }
     updateBar('cpuProgress', (i/total)*100 );
     await sleep(0);
   }
-  const duration = (performance.now() - start) / 1000;
+
+  const duration = (performance.now() - start)/1000;
   const raw = total / duration; // iterations/sec
 
-  // Normalize against a reference and cap at 100 for readability
-  const reference = 10_000_000; // example baseline iterations/sec
+  // Dynamic reference based on core count
+  // Each core assumed to do ~10_000_000 iter/sec baseline
+  const referencePerCore = 10_000_000;
+  const reference = referencePerCore * cores;
+
+  // Compute normalized score (0-100)
   const score100 = Math.min((raw / reference) * 100, 100).toFixed(2);
 
   results.cpu = { rawIterationsPerSec: Number(raw), scoreOutOf100: Number(score100), durationSec: Number(duration) };
   setInner('cpuScore', score100);
+
   destroyChart('cpuChart');
   chartRegistry['cpuChart'] = new Chart(document.getElementById('cpuChart'), {
     type: 'bar',
     data: { labels: ['CPU'], datasets: [{ label: 'Score /100', data: [score100], backgroundColor: '#ff9900' }] }
   });
+
   progress.step();
   return results.cpu;
 }
