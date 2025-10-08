@@ -273,29 +273,37 @@ function displaySystemInfoToUI(sys){
   `;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* ---------- Benchmarks (simplified non-blocking) ---------- */
 
 /* CPU (chunked) — calculates raw iterations/sec and a normalized score out of 100 */
 async function cpuBenchmark(progress){
   if (abortRequested) { setInner('cpuScore','Aborted'); updateBar('cpuProgress',0); progress.step(); return null; }
 
-  const totalOps = 9e7;
   const cores = navigator.hardwareConcurrency || 4;
-  const opsPerWorker = Math.floor(totalOps / cores);
+  const durationSec = 5; // Run benchmark for 5 seconds
   const workers = [];
   const resultsPerWorker = [];
 
   const workerCode = `
     self.onmessage = function(e){
-      const { ops } = e.data;
+      const { durationSec } = e.data;
 
-      const chunkSize = 50000;
-      let i = 0;
-      let sumFloat = 0;
-      let sumInt = 0;
-      let primes = 0;
+      let floatOps = 0, intOps = 0, branchOps = 0, memOps = 0, recursionOps = 0, primeOps = 0, simdOps = 0;
 
-      const arrSize = 1e5;
+      const arrSize = 1e4; // balanced array size
       const arr = new Float64Array(arrSize).map(() => Math.random());
       const arrB = new Float64Array(arrSize).map(() => Math.random());
       const arrC = new Float64Array(arrSize);
@@ -303,50 +311,50 @@ async function cpuBenchmark(progress){
       function fib(n){ return n<2?n:fib(n-1)+fib(n-2); }
 
       const startTime = performance.now();
+      while((performance.now() - startTime)/1000 < durationSec){
+        for(let i=0;i<50000;i++){ // chunked loop
+          // --- FLOAT ---
+          Math.sin(i) * Math.cos(i) * Math.sqrt(i + 1);
+          Math.tan(i) + Math.log(i+1);
+          floatOps++;
 
-      while(i < ops){
-        const end = Math.min(i + chunkSize, ops);
-        for(; i < end; i++){
-          // --- FLOATING POINT WORK ---
-          const x = Math.sin(i) * Math.cos(i) * Math.sqrt(i + 1);
-          const y = Math.tan(x) + Math.log(i+1);
-          sumFloat += y;
+          // --- INTEGER ---
+          (i & 0xff) ^ ((i >> 2) | 5);
+          intOps++;
 
-          // --- INTEGER / BITWISE WORK ---
-          sumInt += (i & 0xff) ^ ((i >> 2) | 5);
+          // --- BRANCH ---
+          if(i % 2 === 0){ branchOps++; } else { branchOps++; }
 
-          // --- BRANCHING ---
-          if(i % 3 === 0) sumInt += i;
-          else if(i % 3 === 1) sumInt -= i;
-          else sumInt ^= i;
-
-          // --- MEMORY ACCESS ---
+          // --- MEMORY ---
           const idx = i % arrSize;
           arr[idx] = arr[idx]*1.01 + Math.sin(i);
-
-          // --- PRIME COUNT ---
-          if(i % 1000 === 0){
-            let n = 100 + (i % 200);
-            let isPrime=true;
-            for(let j=2;j*j<=n;j++){ if(n%j===0){ isPrime=false; break; } }
-            if(isPrime) primes++;
-          }
+          memOps++;
 
           // --- RECURSION ---
-          if(i % 5000 === 0){ sumFloat += fib(10); }
+          if(i % 1000 === 0){ fib(8); recursionOps++; }
 
-          // --- SIMD-LIKE VECTOR MATH ---
-          if(i % 2000 === 0){
+          // --- PRIME ---
+          if(i % 50 === 0){
+            let n = 2 + (i % 50);
+            let isPrime = true;
+            for(let j=2;j*j<=n;j++){ if(n%j===0){ isPrime=false; break; } }
+            if(isPrime) primeOps++;
+          }
+
+          // --- SIMD-LIKE ---
+          if(i % 1000 === 0){
             for(let j=0;j<arrSize;j++){
               arrC[j] = arr[j]*2.0 + arrB[j]*0.5;
+              simdOps++;
             }
           }
+
+          if(self.abortRequested) break;
         }
       }
 
       const duration = (performance.now() - startTime)/1000;
-      const rawOpsPerSec = ops / duration;
-      self.postMessage({ rawOpsPerSec, duration });
+      self.postMessage({ duration, ops: { float: floatOps, integer: intOps, branch: branchOps, memory: memOps, recursion: recursionOps, prime: primeOps, simd: simdOps } });
     };
   `;
 
@@ -361,20 +369,40 @@ async function cpuBenchmark(progress){
       resultsPerWorker.push(e.data);
 
       if(resultsPerWorker.length === cores){
-        const totalRawOps = resultsPerWorker.reduce((a,b) => a + b.rawOpsPerSec, 0) / cores;
-        const avgDuration = resultsPerWorker.reduce((a,b) => a + b.duration, 0) / cores;
+        const agg = { float:0, integer:0, branch:0, memory:0, recursion:0, prime:0, simd:0 };
+        let totalDuration = 0;
+        resultsPerWorker.forEach(w => {
+          Object.keys(agg).forEach(k => { agg[k] += w.ops[k]; });
+          totalDuration += w.duration;
+        });
 
-        const reference = totalRawOps * 1.2;
-        let score100 = (totalRawOps / reference) * 100;
-        score100 = Math.min(Math.max(score100,0),100).toFixed(2);
+        const avgDuration = totalDuration / cores;
+        results.cpu = { opCounts: agg, durationSec: avgDuration };
 
-        results.cpu = { rawOpsPerSec: totalRawOps, scoreOutOf100: Number(score100), durationSec: avgDuration };
-        setInner('cpuScore', score100);
+        // Display counts in scientific notation with 1 decimal place
+        const c = document.getElementById('cpuScore');
+        c.innerHTML = Object.entries(agg)
+          .map(([k,v]) => `${k}: ${v.toExponential(1)}`)
+          .join('<br>');
 
+        // Draw chart with Y-axis in scientific notation
         destroyChart('cpuChart');
         chartRegistry['cpuChart'] = new Chart(document.getElementById('cpuChart'), {
           type: 'bar',
-          data: { labels: ['CPU'], datasets: [{ label: 'Score /100', data: [score100], backgroundColor: '#ff9900' }] }
+          data: {
+            labels: Object.keys(agg),
+            datasets: [{ label: 'Op Counts', data: Object.values(agg), backgroundColor:'#ff9900' }]
+          },
+          options: { 
+            scales: { 
+              y: { 
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) { return value.toExponential(1); }
+                }
+              } 
+            }
+          }
         });
 
         updateBar('cpuProgress',100);
@@ -382,7 +410,7 @@ async function cpuBenchmark(progress){
       }
     };
 
-    worker.postMessage({ ops: opsPerWorker });
+    worker.postMessage({ durationSec });
   }
 
   // Abort support
@@ -396,6 +424,19 @@ async function cpuBenchmark(progress){
     }
   }, 50);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /* Memory (bandwidth) */
