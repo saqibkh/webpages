@@ -206,7 +206,23 @@ function startGame(){
   animationId=requestAnimationFrame(draw);
 }
 
-canvas.addEventListener("mousemove",e=>{const r=canvas.getBoundingClientRect();paddle.x=e.clientX-r.left-paddle.width/2;if(paddle.x<0)paddle.x=0;if(paddle.x+paddle.width>canvas.width)paddle.x=canvas.width-paddle.width;if(!ball.released){ball.x=paddle.x+paddle.width/2;ball.y=paddle.y-ball.radius;}});
+window.addEventListener("mousemove", e => {
+  const r = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - r.left;
+
+  // Only move paddle when mouse is roughly over the canvas horizontally
+  if (mouseX >= 0 && mouseX <= canvas.width) {
+    paddle.x = mouseX - paddle.width / 2;
+    if (paddle.x < 0) paddle.x = 0;
+    if (paddle.x + paddle.width > canvas.width)
+      paddle.x = canvas.width - paddle.width;
+
+    if (!ball.released) {
+      ball.x = paddle.x + paddle.width / 2;
+      ball.y = paddle.y - ball.radius;
+    }
+  }
+});
 canvas.addEventListener("click",()=>{launchBall();});
 document.addEventListener("keydown", e=>{if(e.key==="ArrowLeft")paddle.speed=-7;else if(e.key==="ArrowRight")paddle.speed=7;else if(e.key.toLowerCase()==="p"){paused=!paused;pauseOverlay.style.display=paused?"flex":"none";}else if(e.key===" "&&!ball.released&&!gameOver)launchBall();});
 document.addEventListener("keyup", e=>{if(e.key==="ArrowLeft"||e.key==="ArrowRight")paddle.speed=0;});
