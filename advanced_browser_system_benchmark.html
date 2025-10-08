@@ -279,45 +279,67 @@ function displaySystemInfoToUI(sys){
 async function cpuBenchmark(progress){
   if (abortRequested) { setInner('cpuScore','Aborted'); updateBar('cpuProgress',0); progress.step(); return null; }
 
-  const totalOps = 9e7; // Increased 10x for longer, more realistic benchmark
+  const totalOps = 9e7;
   const cores = navigator.hardwareConcurrency || 4;
   const opsPerWorker = Math.floor(totalOps / cores);
   const workers = [];
   const resultsPerWorker = [];
 
   const workerCode = `
-    self.onmessage = async function(e) {
+    self.onmessage = function(e){
       const { ops } = e.data;
-      const matSize = 10;
-      const matA = Array.from({length: matSize}, () => Array.from({length: matSize}, () => Math.random()));
-      const matB = Array.from({length: matSize}, () => Array.from({length: matSize}, () => Math.random()));
-      const matC = Array.from({length: matSize}, () => Array(matSize).fill(0));
-      let sum = 0;
-      const chunk = 200000;
+
+      const chunkSize = 50000;
       let i = 0;
+      let sumFloat = 0;
+      let sumInt = 0;
+      let primes = 0;
+
+      const arrSize = 1e5;
+      const arr = new Float64Array(arrSize).map(() => Math.random());
+      const arrB = new Float64Array(arrSize).map(() => Math.random());
+      const arrC = new Float64Array(arrSize);
+
+      function fib(n){ return n<2?n:fib(n-1)+fib(n-2); }
+
       const startTime = performance.now();
 
       while(i < ops){
-        const end = Math.min(i + chunk, ops);
+        const end = Math.min(i + chunkSize, ops);
         for(; i < end; i++){
-          const x = Math.sin(i) * Math.cos(i) * Math.sqrt(i);
+          // --- FLOATING POINT WORK ---
+          const x = Math.sin(i) * Math.cos(i) * Math.sqrt(i + 1);
           const y = Math.tan(x) + Math.log(i+1);
-          sum += y;
+          sumFloat += y;
 
+          // --- INTEGER / BITWISE WORK ---
+          sumInt += (i & 0xff) ^ ((i >> 2) | 5);
+
+          // --- BRANCHING ---
+          if(i % 3 === 0) sumInt += i;
+          else if(i % 3 === 1) sumInt -= i;
+          else sumInt ^= i;
+
+          // --- MEMORY ACCESS ---
+          const idx = i % arrSize;
+          arr[idx] = arr[idx]*1.01 + Math.sin(i);
+
+          // --- PRIME COUNT ---
           if(i % 1000 === 0){
-            for(let r=0;r<matSize;r++){
-              for(let c=0;c<matSize;c++){
-                matC[r][c] = 0;
-                for(let k=0;k<matSize;k++){
-                  matC[r][c] += matA[r][k]*matB[k][k];
-                }
-              }
-            }
+            let n = 100 + (i % 200);
+            let isPrime=true;
+            for(let j=2;j*j<=n;j++){ if(n%j===0){ isPrime=false; break; } }
+            if(isPrime) primes++;
           }
 
-          if(i % 5000 === 0){
-            const idx = Math.floor(Math.random() * matSize);
-            sum += matC[idx][(idx+1)%matSize];
+          // --- RECURSION ---
+          if(i % 5000 === 0){ sumFloat += fib(10); }
+
+          // --- SIMD-LIKE VECTOR MATH ---
+          if(i % 2000 === 0){
+            for(let j=0;j<arrSize;j++){
+              arrC[j] = arr[j]*2.0 + arrB[j]*0.5;
+            }
           }
         }
       }
@@ -342,9 +364,7 @@ async function cpuBenchmark(progress){
         const totalRawOps = resultsPerWorker.reduce((a,b) => a + b.rawOpsPerSec, 0) / cores;
         const avgDuration = resultsPerWorker.reduce((a,b) => a + b.duration, 0) / cores;
 
-        // Dynamic reference
         const reference = totalRawOps * 1.2;
-
         let score100 = (totalRawOps / reference) * 100;
         score100 = Math.min(Math.max(score100,0),100).toFixed(2);
 
