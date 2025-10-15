@@ -94,3 +94,14 @@ a:hover {
     font-style: italic;
     color: #555;
 }
+
+.blue-link {
+    color: #1a0dab;  /* standard blue hyperlink color */
+    text-decoration: underline;
+    font-weight: normal;
+    transition: color 0.3s;
+}
+
+.blue-link:hover {
+    color: #0c0080;  /* darker blue on hover */
+}
