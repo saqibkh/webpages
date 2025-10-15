@@ -344,13 +344,18 @@ async function cpuBenchmark(progress){
           }
 
           // --- SIMD-LIKE ---
-          if(i % 1000 === 0){
-            for(let j=0;j<arrSize;j++){
-              arrC[j] = arr[j]*2.0 + arrB[j]*0.5;
-              simdOps++;
+          if(i % 5000 === 0){
+	    // Example: block vector operation (dot product in chunks)
+            const blockSize = 256;
+	    for(let j=0; j<arrSize; j+=blockSize){
+              let sum = 0;
+              for(let k=j; k<Math.min(j+blockSize, arrSize); k++){
+                sum += Math.sin(arr[k]) * Math.cos(arrB[k]) + Math.sqrt(arr[k]*arrB[k] + 1);
+                arrC[k] = sum; // store intermediate result
+                simdOps++;
+              }
             }
-          }
-
+	  }
           if(self.abortRequested) break;
         }
       }
