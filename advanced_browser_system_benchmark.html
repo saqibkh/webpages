@@ -165,8 +165,10 @@
     </h2>
     <p>Ping: <strong id="pingScore">-</strong> ms</p>
     <p>Download: <strong id="downloadSpeed">-</strong> Mbps</p>
-    <p>Upload: <strong id="uploadSpeed">N/A</strong></p>
+    <p>Upload: <strong id="uploadSpeed">-</strong> Mbps</p>
     <div class="progress-container-inner"><div id="pingProgress" class="progress-bar-inner">0%</div></div>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
     <canvas id="pingChart"></canvas>
   </div>
 
@@ -562,13 +564,14 @@ async function storageBenchmark(progress){
 }
 
 /* Network (ping + averaged download). Upload is N/A in browser */
-async function networkBenchmark(progress, pingRepeats = 3, downloadRepeats = 3){
+async function networkBenchmark(progress, pingRepeats = 3, downloadRepeats = 3, uploadRepeats = 3, uploadFileMB = 1){
   if (abortRequested) { setInner('pingScore','Aborted'); setInner('downloadSpeed','-'); setInner('uploadSpeed','N/A'); updateBar('pingProgress',0); progress.step(); return null; }
 
   // NOTE: using a public test file with CORS proxy — in production host your own test files with CORS support.
   const url = "https://cors-anywhere.herokuapp.com/https://speed.hetzner.de/1MB.bin";
   const pingSamples = [];
   const downloadSamples = [];
+  const uploadSamples = [];
   networkAbortController = new AbortController();
   const signal = networkAbortController.signal;
 
@@ -579,7 +582,7 @@ async function networkBenchmark(progress, pingRepeats = 3, downloadRepeats = 3){
     try { await fetch(url, { method: 'HEAD', cache: 'no-cache', signal }); } catch(e){}
     const end = performance.now();
     pingSamples.push(end - start);
-    updateBar('pingProgress', ((i + 1) / (pingRepeats + downloadRepeats)) * 100 );
+    updateBar('pingProgress', ((i + 1) / (pingRepeats + downloadRepeats + uploadRepeats)) * 100);
     await sleep(50);
   }
   const avgPing = Math.round(pingSamples.reduce((a,b)=>a+b,0) / pingSamples.length);
@@ -598,19 +601,65 @@ async function networkBenchmark(progress, pingRepeats = 3, downloadRepeats = 3){
     } catch(e){
       console.warn('Download attempt failed', e);
     }
-    updateBar('pingProgress', ((pingRepeats + i + 1) / (pingRepeats + downloadRepeats)) * 100 );
+    updateBar('pingProgress', ((pingRepeats + i + 1) / (pingRepeats + downloadRepeats + uploadRepeats)) * 100);
     await sleep(100);
   }
   const avgDownload = downloadSamples.length > 0 ? (downloadSamples.reduce((a,b)=>a+b,0) / downloadSamples.length).toFixed(2) : 'Error';
   setInner('downloadSpeed', avgDownload);
-  setInner('uploadSpeed', 'N/A');
+
+
+  // ----------------- Upload (Firebase Storage) -----------------
+  try {
+    // Initialize Firebase if not already initialized
+    if (!firebase.apps.length) {
+      const firebaseConfig = {
+        apiKey: "AIzaSyAq2hgVl57ghaVeVSVTkt7f8axol3PNJKA",
+        authDomain: "speedtestapp-62de0.firebaseapp.com",
+        projectId: "speedtestapp-62de0",
+        storageBucket: "speedtestapp-62de0.firebasestorage.app",
+        messagingSenderId: "682303567677",
+        appId: "1:682303567677:web:c4c13f19d835c6410ff754",
+        measurementId: "G-PTFTGTSP79"
+      };
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    const storageRef = firebase.storage().ref();
+    const blobSize = uploadFileMB * 1024 * 1024;
+    const randomBlob = new Blob([new Uint8Array(blobSize)], { type: 'application/octet-stream' });
+
+    for (let i = 0; i < uploadRepeats; i++) {
+      if (abortRequested) break;
+      const fileRef = storageRef.child(`network-test-${Date.now()}-${i}.bin`);
+      const start = performance.now();
+      try {
+        await fileRef.put(randomBlob, { signal });
+        const durationSec = (performance.now() - start) / 1000;
+        const mbps = (uploadFileMB * 8 / durationSec).toFixed(2); // MB -> Mbps
+        uploadSamples.push(parseFloat(mbps));
+      } catch(e){
+        console.warn('Upload attempt failed', e);
+      }
+      updateBar('pingProgress', ((pingRepeats + downloadRepeats + i + 1) / (pingRepeats + downloadRepeats + uploadRepeats)) * 100 );
+      await sleep(100);
+    }
+    const avgUpload = uploadSamples.length > 0 ? (uploadSamples.reduce((a,b)=>a+b,0)/uploadSamples.length).toFixed(2) : 'Error';
+    setInner('uploadSpeed', avgUpload);
+  } catch (e) {
+    console.error("Firebase Upload Error:", e);
+    setInner('uploadSpeed','Error');
+  }
+
 
   results.network = { avgPingMs: avgPing, downloadMbps: parseFloat(avgDownload) || null, uploadMbps: null, pingSamples, downloadSamples };
 
   destroyChart('pingChart');
   chartRegistry['pingChart'] = new Chart(document.getElementById('pingChart'), {
     type: 'bar',
-    data: { labels: ['Ping ms','Download Mbps','Upload'], datasets: [{ label: 'Network', data: [avgPing, parseFloat(avgDownload) || 0, 0], backgroundColor: ['#ff3333','#33ccff','#ff9900'] }] }
+    data: { labels: ['Ping ms','Download Mbps','Upload Mbps'], datasets: [{ 
+	label: 'Network', 
+	data: [avgPing, parseFloat(avgDownload) || 0, 0], 
+	backgroundColor: ['#ff3333','#33ccff','#ff9900'] }] }
   });
 
   progress.step();
