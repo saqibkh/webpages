@@ -572,6 +572,7 @@ async function networkBenchmark(progress, pingRepeats = 3, downloadRepeats = 3, 
   const pingSamples = [];
   const downloadSamples = [];
   const uploadSamples = [];
+  const uploadedFiles = []; // <-- Track uploaded files
   networkAbortController = new AbortController();
   const signal = networkAbortController.signal;
 
@@ -631,6 +632,7 @@ async function networkBenchmark(progress, pingRepeats = 3, downloadRepeats = 3, 
     for (let i = 0; i < uploadRepeats; i++) {
       if (abortRequested) break;
       const fileRef = storageRef.child(`network-test-${Date.now()}-${i}.bin`);
+      uploadedFiles.push(fileRef); // Track file for cleanup
       const start = performance.now();
       try {
         await fileRef.put(randomBlob, { signal });
@@ -648,6 +650,16 @@ async function networkBenchmark(progress, pingRepeats = 3, downloadRepeats = 3, 
   } catch (e) {
     console.error("Firebase Upload Error:", e);
     setInner('uploadSpeed','Error');
+  } finally {
+    // ---------- Cleanup Uploaded Files ----------
+    for (const fileRef of uploadedFiles) {
+      try {
+        await fileRef.delete();
+        console.log(`Deleted uploaded file: ${fileRef.fullPath}`);
+      } catch (e) {
+        console.warn(`Failed to delete file ${fileRef.fullPath}:`, e);
+      }
+    }
   }
 
 
