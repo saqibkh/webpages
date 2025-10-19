@@ -22,9 +22,9 @@ canvas {
   display: block;
   border-radius: 10px;
   background: #031022;
-  margin: 0;
-  width: auto;       /* controlled by JS */
-  height: auto;      /* controlled by JS */
+  width: 100%;
+  height: 100%;        /* fill parent section height */
+  object-fit: contain;  /* maintain aspect ratio without overflow */
 }
 
 /* Buttons styling */
