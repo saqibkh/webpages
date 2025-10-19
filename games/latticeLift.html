@@ -6,6 +6,7 @@
   <title>LatticeLift — Stronger AI Edition</title>
   <meta name="description" content="LatticeLift — modern Connect-N with a stronger Expert AI (iterative deepening, alpha-beta, transposition table)." />
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css">
   <style>
     body { background: linear-gradient(180deg,#071025,#0b1220); color:#e6eef8; font-family:Inter,system-ui,Arial; }
     .panel{ backdrop-filter: blur(6px); background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.04); }
@@ -25,13 +26,13 @@
     </div>
   </header>
 
-  <main class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6">
-    <section class="md:col-span-2 panel rounded-xl p-4">
-      <canvas id="three-canvas" width="840" height="560"></canvas>
+  <main class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <section class="lg:col-span-2 panel rounded-xl p-4">
+      <canvas id="three-canvas"></canvas>
       <div id="thinking" class="mt-2 text-sm text-amber-300 hidden">AI thinking...</div>
     </section>
 
-    <aside class="panel rounded-xl p-4">
+    <aside class="panel rounded-xl p-4 max-h-[80vh] overflow-y-auto">
       <h2 class="font-semibold mb-2">Settings</h2>
       <div class="space-y-3 text-sm">
         <label class="flex justify-between items-center"><span>Rows</span><input id="rows" type="number" min="4" max="10" value="6" class="w-20 text-black px-2 py-1 rounded" /></label>
@@ -111,7 +112,7 @@ function newGame(){
   if (vsAI && currentPlayer === humanPlayers + 1) triggerAI();
 }
 newGame();
-
+window.addEventListener('resize', resizeCanvas);
 applyBtn.addEventListener('click', newGame);
 restartBtn.addEventListener('click', newGame);
 presetBtn && presetBtn.addEventListener('click', () => { rowsInput.value=6; colsInput.value=7; connectNInput.value=4; humanPlayersInput.value=1; vsAICheck.checked=true; aiDifficultySelect.value='medium'; newGame(); });
@@ -119,8 +120,10 @@ undoBtn.addEventListener('click', undoMove);
 
 /* canvas sizing */
 function resizeCanvas(){
-  canvas.width = 840;
-  canvas.height = 560;
+  const container = canvas.parentElement;
+  const width = container.clientWidth;
+  canvas.width = width;
+  canvas.height = width * 2/3; // maintain 3:2 ratio
 }
 
 /* draw board simple 2D polished look */
