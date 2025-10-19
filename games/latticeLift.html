@@ -229,24 +229,27 @@ function roundRect(ctx,x,y,w,h,r,fill){
 canvas.addEventListener('click', (ev) => {
   if (winner) return;
   const rect = canvas.getBoundingClientRect();
-  const cx = ev.clientX - rect.left;
-  const cy = ev.clientY - rect.top;
-  // map to column
+  const scaleX = canvas.width / rect.width;   // pixels per CSS pixel
+  const scaleY = canvas.height / rect.height;
+
+  const cx = (ev.clientX - rect.left) * scaleX;
+  const cy = (ev.clientY - rect.top) * scaleY;
+
+  // same as before
   const pad = 20;
-  const availableW = canvas.width - pad*2;
-  const availableH = canvas.height - pad*2;
-  const cellW = Math.floor(Math.min(availableW/cols, availableH/rows));
+  const cellW = Math.floor(Math.min((canvas.width/scaleX - pad*2)/cols, (canvas.height/scaleY - pad*2)/rows));
   const boardW = cellW * cols;
   const boardH = cellW * rows;
-  const ox = (canvas.width - boardW)/2;
-  const oy = (canvas.height - boardH)/2;
-  if (cx < ox || cx > ox+boardW || cy < oy || cy > oy+boardH) return;
-  const col = Math.floor((cx - ox) / cellW);
-  // if it's human's turn
-  if (!(vsAI && currentPlayer === humanPlayers + 1) ) {
-    playerPlace(col);
-  }
+  const ox = (canvas.width/scaleX - boardW)/2;
+  const oy = (canvas.height/scaleY - boardH)/2;
+
+  if (cx/scaleX < ox || cx/scaleX > ox+boardW || cy/scaleY < oy || cy/scaleY > oy+boardH) return;
+
+  const col = Math.floor((cx/scaleX - ox) / cellW);
+  playerPlace(col);
 });
+
+
 
 /* place token for player/hotseat */
 function playerPlace(col, fromAI=false){
