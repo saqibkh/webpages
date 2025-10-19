@@ -119,11 +119,17 @@ presetBtn && presetBtn.addEventListener('click', () => { rowsInput.value=6; cols
 undoBtn.addEventListener('click', undoMove);
 
 /* canvas sizing */
-function resizeCanvas(){
+function resizeCanvas() {
   const container = canvas.parentElement;
   const width = container.clientWidth;
-  canvas.width = width;
-  canvas.height = width * 2/3; // maintain 3:2 ratio
+  canvas.width = width * window.devicePixelRatio;
+  canvas.height = width * 2 / 3 * window.devicePixelRatio; // keep 3:2 aspect ratio
+
+  // scale the drawing context so shapes are crisp on HiDPI (Retina) displays
+  ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+
+  // redraw everything after resize
+  draw();
 }
 
 /* draw board simple 2D polished look */
