@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LatticeLift — Stronger AI Edition</title>
+  <meta name="description" content="LatticeLift — modern Connect-N with a stronger Expert AI (iterative deepening, alpha-beta, transposition table)." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { background: linear-gradient(180deg,#071025,#0b1220); color:#e6eef8; font-family:Inter,system-ui,Arial; }
+    .panel{ backdrop-filter: blur(6px); background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.04); }
+    canvas{ display:block; border-radius:10px; background:#031022; margin:0 auto; }
+    .btn { padding:.4rem .7rem; border-radius:.4rem; font-weight:600; }
+  </style>
+</head>
+<body class="p-6 flex flex-col items-center gap-6">
+  <header class="w-full max-w-5xl flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-extrabold text-blue-300">LatticeLift — Stronger AI</h1>
+      <p class="text-sm text-gray-300">Expert now uses iterative deepening + transposition table + move ordering.</p>
+    </div>
+    <div class="flex gap-2">
+      <button id="restartBtn" class="btn bg-indigo-600 text-white">New Game</button>
+      <button id="undoBtn" class="btn bg-gray-700">Undo</button>
+    </div>
+  </header>
+
+  <main class="w-full max-w-7xl flex flex-col lg:flex-row gap-6">
+    <!-- Game Grid Panel -->
+    <section class="panel rounded-xl p-4 flex-1 flex flex-col">
+      <canvas id="three-canvas" class="flex-1 w-full"></canvas>
+      <div id="thinking" class="mt-2 text-sm text-amber-300 hidden">AI thinking...</div>
+    </section>
+
+    <!-- Divider -->
+    <div class="hidden lg:block w-1 bg-gray-700/50 mx-4 rounded-full"></div>
+
+     <!-- Options Panel -->
+    <aside class="panel rounded-xl p-4 max-h-[80vh] overflow-y-auto">
+      <h2 class="font-semibold mb-2">Settings</h2>
+      <div class="space-y-3 text-sm">
+        <label class="flex justify-between items-center"><span>Rows</span><input id="rows" type="number" min="4" max="10" value="6" class="w-20 text-black px-2 py-1 rounded" /></label>
+        <label class="flex justify-between items-center"><span>Columns</span><input id="cols" type="number" min="4" max="10" value="7" class="w-20 text-black px-2 py-1 rounded" /></label>
+        <label class="flex justify-between items-center"><span>Connect N</span><input id="connectN" type="number" min="3" max="10" value="4" class="w-20 text-black px-2 py-1 rounded" /></label>
+        <label class="flex justify-between items-center"><span>Human players</span><input id="humanPlayers" type="number" min="1" max="4" value="1" class="w-20 text-black px-2 py-1 rounded" /></label>
+        <label class="flex items-center gap-3"><input id="vsAI" type="checkbox" checked /><span>Play vs Computer</span></label>
+        <label class="flex justify-between items-center"><span>AI Difficulty</span>
+          <select id="aiDifficulty" class="w-28 text-black px-2 py-1 rounded">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert</option>
+          </select>
+        </label>
+
+        <div class="flex gap-2 pt-2">
+          <button id="applyBtn" class="btn bg-green-600 text-white flex-1">Apply</button>
+          <button id="presetBtn" class="btn bg-gray-700">Preset</button>
+        </div>
+
+        <div class="pt-3 text-xs text-gray-300">
+          <div id="statusText">Current turn: Player 1</div>
+          <div id="resultText" class="font-medium mt-2"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+<script>
+/* =========================
+   Game + Rendering (Canvas 2D simplified)
+   + Improved AI (worker)
+   ========================= */
+
+const canvas = document.getElementById('three-canvas');
+const ctx = canvas.getContext('2d');
+const rowsInput = document.getElementById('rows');
+const colsInput = document.getElementById('cols');
+const connectNInput = document.getElementById('connectN');
+const humanPlayersInput = document.getElementById('humanPlayers');
+const vsAICheck = document.getElementById('vsAI');
+const aiDifficultySelect = document.getElementById('aiDifficulty');
+const applyBtn = document.getElementById('applyBtn');
+const restartBtn = document.getElementById('restartBtn');
+const undoBtn = document.getElementById('undoBtn');
+const statusText = document.getElementById('statusText');
+const resultText = document.getElementById('resultText');
+const thinkingEl = document.getElementById('thinking');
+
+let rows=6, cols=7, connectN=4, humanPlayers=1, vsAI=true, aiDifficulty='medium';
+let board=[], moveHistory=[], currentPlayer=1, winner=null, animating=false;
+
+/* initialize */
+function initParams(){
+  rows=clamp(parseInt(rowsInput.value)||6,4,10);
+  cols=clamp(parseInt(colsInput.value)||7,4,14);
+  connectN=clamp(parseInt(connectNInput.value)||4,3,10);
+  humanPlayers=clamp(parseInt(humanPlayersInput.value)||1,1,4);
+  vsAI = vsAICheck.checked;
+  aiDifficulty = aiDifficultySelect.value;
+}
+initParams();
+
+/* create board and ui */
+function newGame(){
+  initParams();
+  board = Array.from({length: rows},()=>Array(cols).fill(0));
+  moveHistory = [];
+  currentPlayer = 1;
+  winner = null;
+  resultText.textContent = '';
+  resizeCanvas();
+  draw();
+  updateStatus();
+  // if AI should start (rare), trigger
+  if (vsAI && currentPlayer === humanPlayers + 1) triggerAI();
+}
+newGame();
+window.addEventListener('resize', resizeCanvas);
+applyBtn.addEventListener('click', newGame);
+restartBtn.addEventListener('click', newGame);
+presetBtn && presetBtn.addEventListener('click', () => { rowsInput.value=6; colsInput.value=7; connectNInput.value=4; humanPlayersInput.value=1; vsAICheck.checked=true; aiDifficultySelect.value='medium'; newGame(); });
+undoBtn.addEventListener('click', undoMove);
+
+/* canvas sizing */
+function resizeCanvas() {
+  const container = canvas.parentElement; // panel div
+  const maxWidth = container.parentElement.clientWidth; // main area width
+  const maxHeight = window.innerHeight * 0.75; // leave room for header/settings
+
+  const baseCell = 70; // desired cell size
+  const desiredWidth = cols * baseCell + 40; // padding
+  const desiredHeight = rows * baseCell + 40;
+
+  // scale down if needed to fit screen
+  const scale = Math.min(maxWidth / desiredWidth, maxHeight / desiredHeight, 1);
+
+  // set panel size
+  container.style.width = `${desiredWidth * scale}px`;
+  container.style.height = `${desiredHeight * scale}px`;
+
+  // canvas HiDPI
+  canvas.width = desiredWidth * scale * window.devicePixelRatio;
+  canvas.height = desiredHeight * scale * window.devicePixelRatio;
+
+  ctx.setTransform(window.devicePixelRatio * scale, 0, 0, window.devicePixelRatio * scale, 0, 0);
+
+  draw();
+}
+
+
+/* draw board simple 2D polished look */
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const pad = 20;                 // padding around the board
+  const baseCell = 70;            // fixed cell size
+  const boardW = cols * baseCell;
+  const boardH = rows * baseCell;
+
+  // account for any canvas scaling
+  const transform = ctx.getTransform();
+  const ox = (canvas.width / transform.a - boardW) / 2;
+  const oy = (canvas.height / transform.d - boardH) / 2;
+
+  // draw board background with rounded corners
+  roundRect(ctx, ox - 8, oy - 8, boardW + 16, boardH + 16, 12, '#04243b');
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = ox + c * baseCell;
+      const y = oy + r * baseCell;
+
+      // slot background
+      ctx.fillStyle = '#001b2b';
+      ctx.fillRect(x + 6, y + 6, baseCell - 12, baseCell - 12);
+
+      // token
+      const v = board[r][c];
+      const cx = x + baseCell / 2;
+      const cy = y + baseCell / 2;
+      const rad = Math.floor(baseCell * 0.34);
+
+      if (v === 0) {
+        const g = ctx.createRadialGradient(cx - 6, cy - 8, 4, cx, cy, rad);
+        g.addColorStop(0, '#002233');
+        g.addColorStop(1, '#001221');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const palette = {
+          1: ['#ff6b6b', '#c30000'],
+          2: ['#ffd86b', '#c99e00'],
+          3: ['#6ea8fe', '#2b6fd6'],
+          4: ['#7cf7c1', '#00a65a']
+        };
+        const [col1, col2] = palette[v];
+        const g = ctx.createRadialGradient(cx - 8, cy - 10, 4, cx, cy, rad);
+        g.addColorStop(0, col1);
+        g.addColorStop(1, col2);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+        ctx.fill();
+
+        // rim
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+
+/* helpers for drawing */
+function roundRect(ctx,x,y,w,h,r,fill){
+  ctx.fillStyle = fill; ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath(); ctx.fill();
+}
+
+/* click handling -> column selection */
+canvas.addEventListener('click', (ev) => {
+  if (winner) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;   // pixels per CSS pixel
+  const scaleY = canvas.height / rect.height;
+
+  const cx = (ev.clientX - rect.left) * scaleX;
+  const cy = (ev.clientY - rect.top) * scaleY;
+
+  // same as before
+  const pad = 20;
+  const cellW = Math.floor(Math.min((canvas.width/scaleX - pad*2)/cols, (canvas.height/scaleY - pad*2)/rows));
+  const boardW = cellW * cols;
+  const boardH = cellW * rows;
+  const ox = (canvas.width/scaleX - boardW)/2;
+  const oy = (canvas.height/scaleY - boardH)/2;
+
+  if (cx/scaleX < ox || cx/scaleX > ox+boardW || cy/scaleY < oy || cy/scaleY > oy+boardH) return;
+
+  const col = Math.floor((cx/scaleX - ox) / cellW);
+  playerPlace(col);
+});
+
+
+
+/* place token for player/hotseat */
+function playerPlace(col, fromAI=false){
+  const r = getDropRow(col);
+  if (r === -1) return;
+  board[r][col] = currentPlayer;
+  moveHistory.push({r,c:col,player:currentPlayer});
+  draw();
+  const chk = checkWin(board, rows, cols, connectN);
+  if (chk.winner !== null){
+    winner = chk.winner; updateStatus(); return;
+  }
+  if (isBoardFull(board)){ winner = -1; updateStatus(); return; }
+  const totalPlayers = humanPlayers + (vsAI?1:0);
+  currentPlayer = (currentPlayer % totalPlayers) + 1;
+  updateStatus();
+  // if AI turn -> trigger
+  if (vsAI && currentPlayer === humanPlayers + 1) triggerAI();
+}
+
+/* undo */
+function undoMove(){
+  if (moveHistory.length === 0 || animating) return;
+  const last = moveHistory.pop();
+  board[last.r][last.c] = 0;
+  winner = null;
+  currentPlayer = last.player;
+  draw();
+  updateStatus();
+}
+
+/* get drop row in column */
+function getDropRow(col){
+  for (let r=rows-1;r>=0;r--) if (board[r][col]===0) return r;
+  return -1;
+}
+
+/* check win utility */
+function checkWin(b, rows, cols, connectN){
+  const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+  for (let r=0;r<rows;r++){
+    for (let c=0;c<cols;c++){
+      const v = b[r][c];
+      if (v===0) continue;
+      for (const d of dirs){
+        let ok = true;
+        const line = [[r,c]];
+        for (let k=1;k<connectN;k++){
+          const rr = r + d[0]*k, cc = c + d[1]*k;
+          if (rr<0||rr>=rows||cc<0||cc>=cols){ ok=false; break; }
+          if (b[rr][cc] !== v){ ok=false; break; }
+          line.push([rr,cc]);
+        }
+        if (ok && line.length === connectN) return { winner: v, line };
+      }
+    }
+  }
+  return { winner: null, line: [] };
+}
+
+function isBoardFull(b){
+  for (let c=0;c<cols;c++) if (b[0][c]===0) return false;
+  return true;
+}
+
+function updateStatus(){
+  if (winner !== null){
+    if (winner === -1){ statusText.textContent = 'Draw'; resultText.textContent = 'Game ended in a draw.'; }
+    else { statusText.textContent = `Player ${winner} wins!`; resultText.textContent = `Player ${winner} won — nice!`; }
+  } else { statusText.textContent = `Current turn: Player ${currentPlayer}`; resultText.textContent=''; }
+}
+
+/* =========================
+   Strong AI Worker (iterative deepening, alpha-beta, transposition table)
+   ========================= */
+
+let aiWorker = createAIWorker();
+aiWorker.onmessage = (ev) => {
+  const data = ev.data;
+  if (data.type === 'think') {
+    thinkingEl.classList.remove('hidden');
+  } else if (data.type === 'move') {
+    thinkingEl.classList.add('hidden');
+    if (data.col >= 0 && winner === null) {
+      // place AI move
+      playerPlace(data.col, true);
+    }
+  } else if (data.type === 'error') {
+    thinkingEl.classList.add('hidden');
+    console.error('AI worker error:', data.error);
+  }
+};
+
+function triggerAI(){
+  // prepare flatten board
+  const flat = [];
+  for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) flat.push(board[r][c]);
+  const level = aiDifficulty;
+  aiWorker.postMessage({ cmd:'think', board: flat, rows, cols, connectN, humanPlayers, level });
+}
+
+/* create inline worker with stronger AI */
+function createAIWorker(){
+  const code = `
+  self.onmessage = function(ev){
+    try {
+      const msg = ev.data;
+      if (msg.cmd !== 'think') return;
+      const flat = msg.board;
+      const rows = msg.rows, cols = msg.cols, connectN = msg.connectN;
+      const humanPlayers = msg.humanPlayers;
+      const level = msg.level;
+      const AI_PLAYER = humanPlayers + 1; // AI acts as the next player
+      const playersCount = humanPlayers + (msg.vsAI === false ? 0 : 1);
+
+      // convert flat to 2D accessors
+      function idx(r,c){ return r*cols + c; }
+      function clone(b){ return b.slice(); }
+      function get(r,c){ return flat[idx(r,c)]; }
+      function setFlat(b,r,c,val){ b[idx(r,c)] = val; }
+
+      // helper: legal moves (columns not full)
+      function legalMoves(b){
+        const moves = [];
+        for (let c=0;c<cols;c++) if (b[idx(0,c)]===0) moves.push(c);
+        return moves;
+      }
+      function getDropRow(b,c){
+        for (let r=rows-1;r>=0;r--) if (b[idx(r,c)]===0) return r;
+        return -1;
+      }
+      function applyMove(b,c,player){
+        const r = getDropRow(b,c);
+        if (r===-1) return false;
+        b[idx(r,c)] = player;
+        return true;
+      }
+      function isFull(b){ for (let c=0;c<cols;c++) if (b[idx(0,c)]===0) return false; return true; }
+
+      // quick win/block detection: check if a move gives immediate win
+      function immediateWinningMove(b, player){
+        const moves = legalMoves(b);
+        for (const m of moves){
+          const nb = clone(b);
+          applyMove(nb,m,player);
+          if (checkWinFlat(nb, player)) return m;
+        }
+        return -1;
+      }
+
+      function checkWinFlat(b, playerToCheck){
+        const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+        for (let r=0;r<rows;r++){
+          for (let c=0;c<cols;c++){
+            const v = b[idx(r,c)];
+            if (v===0) continue;
+            for (const d of dirs){
+              let ok=true;
+              for (let k=1;k<connectN;k++){
+                const rr=r + d[0]*k, cc=c + d[1]*k;
+                if (rr<0||rr>=rows||cc<0||cc>=cols){ ok=false; break; }
+                if (b[idx(rr,cc)] !== v){ ok=false; break; }
+              }
+              if (ok && v === playerToCheck) return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      // evaluation heuristic: counts of lines for AI minus opponent
+      function evaluate(b, me){
+        const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+        let score=0;
+        for (let r=0;r<rows;r++){
+          for (let c=0;c<cols;c++){
+            for (const d of dirs){
+              let countMe=0, countOpp=0, spaces=0;
+              for (let k=0;k<connectN;k++){
+                const rr=r + d[0]*k, cc=c + d[1]*k;
+                if (rr<0||rr>=rows||cc<0||cc>=cols){ spaces=-999; break; }
+                const v = b[idx(rr,cc)];
+                if (v===0) spaces++;
+                else if (v===me) countMe++;
+                else countOpp++;
+              }
+              if (spaces>=0){
+                if (countMe>0 && countOpp===0) score += Math.pow(10, countMe);
+                if (countOpp>0 && countMe===0) score -= Math.pow(10, countOpp);
+              }
+            }
+          }
+        }
+        // center control
+        const center = Math.floor(cols/2);
+        for (let r=0;r<rows;r++) if (b[idx(r,center)]===me) score += 3;
+        return score;
+      }
+
+      // transposition table
+      const tt = new Map();
+
+      function boardKey(b){
+        // create short string key - faster than JSON
+        return b.join(',');
+      }
+
+      // move ordering: prefer center moves and immediate wins
+      function orderMoves(b, moves, player){
+        // score moves by whether immediate win/block and proximity to center
+        const center = (cols-1)/2;
+        const arr = moves.map(m => {
+          let score = -Math.abs(m - center);
+          // immediate win
+          const nb = clone(b); applyMove(nb,m,player);
+          if (checkWinFlat(nb, player)) score += 1000;
+          // block opponent immediate win
+          const opp = player===AI_PLAYER? (player-1>0?1:1) : AI_PLAYER;
+          const nb2 = clone(b); applyMove(nb2,m,opp);
+          if (checkWinFlat(nb2, opp)) score += 800;
+          return {m,score};
+        });
+        arr.sort((a,b2)=>b2.score - a.score);
+        return arr.map(x=>x.m);
+      }
+
+      // alpha-beta with transposition table
+      function alphabeta(b, depth, alpha, beta, maximizingPlayer, me){
+        const key = boardKey(b) + '|' + (maximizingPlayer?1:0) + '|' + depth;
+        if (tt.has(key)) return tt.get(key);
+        // terminal
+        if (checkWinFlat(b, me)) { return 1000000; }
+        // check opponent win
+        const opp = me===AI_PLAYER? (me-1>0?1:1) : AI_PLAYER;
+        if (checkWinFlat(b, opp)) { return -1000000; }
+        if (depth===0 || isFull(b)) { const val = evaluate(b, me); tt.set(key,val); return val; }
+        const moves = legalMoves(b);
+        if (moves.length===0) return 0;
+        let ordered = orderMoves(b, moves, maximizingPlayer?me:opp);
+
+        if (maximizingPlayer){
+          let value = -Infinity;
+          for (const m of ordered){
+            const nb = clone(b);
+            applyMove(nb,m,me);
+            const v = alphabeta(nb, depth-1, alpha, beta, false, me);
+            if (v > value) value = v;
+            if (value > alpha) alpha = value;
+            if (alpha >= beta) break;
+          }
+          tt.set(key,value);
+          return value;
+        } else {
+          let value = Infinity;
+          for (const m of ordered){
+            const nb = clone(b);
+            applyMove(nb,m,opp);
+            const v = alphabeta(nb, depth-1, alpha, beta, true, me);
+            if (v < value) value = v;
+            if (value < beta) beta = value;
+            if (alpha >= beta) break;
+          }
+          tt.set(key,value);
+          return value;
+        }
+      }
+
+      // iterative deepening
+      function iterativeDeepening(b, maxTimeMs){
+        const start = Date.now();
+        let bestMove = -1;
+        let bestScore = -Infinity;
+        // quick tactical checks
+        const winMove = immediateWinningMove(b, AI_PLAYER);
+        if (winMove !== -1) return winMove;
+        // block opponent immediate win(s)
+        // assume single human player index 1 for simplicity in this prototype
+        const opp = AI_PLAYER - 1 >= 1 ? (AI_PLAYER - 1) : 1;
+        const block = immediateWinningMove(b, opp);
+        if (block !== -1) return block;
+
+        const moves = legalMoves(b);
+        // center-first baseline ordering
+        const center = Math.floor(cols/2);
+        moves.sort((a,b2)=> Math.abs(a-center) - Math.abs(b2-center));
+
+        for (let depth=2; depth<=12; depth++){
+          if (Date.now() - start > maxTimeMs) break;
+          // clear tt to avoid stale depth keys; keep some entries to help deeper searches
+          // (we keep tt across depths here)
+          let localBest = -1, localBestScore = -Infinity;
+          for (const m of moves){
+            const nb = clone(b);
+            applyMove(nb,m,AI_PLAYER);
+            const score = alphabeta(nb, depth-1, -Infinity, Infinity, false, AI_PLAYER);
+            if (score > localBestScore){ localBestScore = score; localBest = m; }
+          }
+          if (localBestScore > bestScore){ bestScore = localBestScore; bestMove = localBest; }
+          // if decisive win found, break
+          if (bestScore >= 500000) break;
+        }
+        return bestMove;
+      }
+
+      // choose depth by level
+      let chosen = -1;
+      if (level === 'easy'){
+        const moves = legalMoves(flat);
+        chosen = moves[Math.floor(Math.random()*moves.length)];
+        self.postMessage({type:'move', col: chosen});
+        return;
+      } else if (level === 'medium'){
+        // depth 4 search (fast)
+        // try immediate win/block first
+        const copy = clone(flat);
+        const win = immediateWinningMove(copy, AI_PLAYER);
+        if (win !== -1){ self.postMessage({type:'move', col:win}); return; }
+        const opp = AI_PLAYER - 1 >=1 ? (AI_PLAYER -1) : 1;
+        const block = immediateWinningMove(copy, opp);
+        if (block !== -1){ self.postMessage({type:'move', col:block}); return; }
+        // search depth 4 with time cap 300ms
+        const move = iterativeDeepening(copy, 300);
+        self.postMessage({type:'move', col: move});
+        return;
+      } else if (level === 'hard'){
+        const move = iterativeDeepening(flat, 800);
+        self.postMessage({type:'move', col: move});
+        return;
+      } else { // expert
+        self.postMessage({type:'think'});
+        const move = iterativeDeepening(flat, 2000);
+        self.postMessage({type:'move', col: move});
+        return;
+      }
+
+    } catch(err){
+      self.postMessage({type:'error', error:err.message});
+    }
+  };`;
+  const blob = new Blob([code], { type: 'application/javascript' });
+  return new Worker(URL.createObjectURL(blob));
+}
+
+/* AI trigger wrapper */
+function triggerAI(){
+  thinkingEl.classList.remove('hidden');
+  // flatten board
+  const flat = [];
+  for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) flat.push(board[r][c]);
+  aiWorker.postMessage({ cmd:'think', board: flat, rows, cols, connectN, humanPlayers, level: aiDifficulty });
+}
+
+/* =========================
+   Utility functions
+   ========================= */
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function randInt(n){ return Math.floor(Math.random()*n); }
+
+/* Minimal minimax used locally only for heuristic fallback (not used by worker) */
+// Not necessary here — worker handles heavy lifting
+
+/* =========================
+   Start drawing loop & status update
+   ========================= */
+function gameLoop(){
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+gameLoop();
+
+function updateStatus(){
+  if (winner !== null){
+    if (winner === -1){ statusText.textContent = 'Draw'; resultText.textContent = 'Draw'; }
+    else { statusText.textContent = `Player ${winner} wins!`; resultText.textContent = `Player ${winner} won`; }
+  } else {
+    statusText.textContent = `Current turn: Player ${currentPlayer}`;
+    resultText.textContent = '';
+  }
+}
+
+/* =========================
+   Player move handling (hotseat)
+   ========================= */
+function playerPlace(col){
+  if (winner !== null) return;
+  const r = getDropRow(col);
+  if (r === -1) return;
+  board[r][col] = currentPlayer;
+  moveHistory.push({r,c:col,player:currentPlayer});
+  // check win
+  const chk = checkWin(board, rows, cols, connectN);
+  if (chk.winner !== null){ winner = chk.winner; updateStatus(); return; }
+  if (isBoardFull(board)){ winner = -1; updateStatus(); return; }
+  const totalPlayers = humanPlayers + (vsAI?1:0);
+  currentPlayer = (currentPlayer % totalPlayers) + 1;
+  updateStatus();
+  // if next is AI
+  if (vsAI && currentPlayer === humanPlayers + 1){
+    triggerAI();
+  }
+}
+
+/* expose triggerAI from outside (used on load) */
+window.triggerAI = triggerAI;
+
+</script>
+</body>
+</html>
+
