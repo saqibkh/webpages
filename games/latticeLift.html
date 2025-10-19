@@ -27,12 +27,16 @@
   </header>
 
   <main class="w-full max-w-5xl flex flex-col lg:flex-row gap-6">
-    <section class="lg:col-span-2 panel rounded-xl p-4">
+    <!-- Game Grid Panel -->
     <section class="panel rounded-xl p-4 flex-1 flex flex-col">
       <canvas id="three-canvas" class="flex-1 w-full"></canvas>
       <div id="thinking" class="mt-2 text-sm text-amber-300 hidden">AI thinking...</div>
     </section>
 
+    <!-- Divider -->
+    <div class="hidden lg:block w-1 bg-gray-700/50 mx-4 rounded-full"></div>
+
+     <!-- Options Panel -->
     <aside class="panel rounded-xl p-4 max-h-[80vh] overflow-y-auto">
       <h2 class="font-semibold mb-2">Settings</h2>
       <div class="space-y-3 text-sm">
