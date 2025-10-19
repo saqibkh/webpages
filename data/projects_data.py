@@ -10,6 +10,16 @@ projects = [
     },
 
     {
+      "name": "LatticeLift",
+      "description": "LatticeLift is an advanced Connect-4 variant with AI opponents and customizable board settings.",
+      "link": "games/latticeLift/latticeLift.html",
+      "details": (
+          "Players take turns dropping tokens into a grid, aiming to connect a line of tokens horizontally, vertically, or diagonally. The game supports multiple human players or challenging AI opponents with configurable difficulty levels. Board size, number of rows, columns, and the required tokens to connect can be customized for varied gameplay. The interface features smooth canvas rendering and interactive controls for a polished experience."
+        ),
+      "type": "application"
+    },
+
+    {
       "name": "Paddle Smash",
       "description": "A visually enhanced block-breaking game with multiple levels, paddle control, and real-time scoring.",
       "link": "paddle_smash.html",
