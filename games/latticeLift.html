@@ -120,68 +120,98 @@ undoBtn.addEventListener('click', undoMove);
 
 /* canvas sizing */
 function resizeCanvas() {
-  const container = canvas.parentElement;
-  const width = container.clientWidth;
-  canvas.width = width * window.devicePixelRatio;
-  canvas.height = width * 2 / 3 * window.devicePixelRatio; // keep 3:2 aspect ratio
+  const container = canvas.parentElement; // panel div
+  const maxWidth = container.parentElement.clientWidth; // main area width
+  const maxHeight = window.innerHeight * 0.75; // leave room for header/settings
 
-  // scale the drawing context so shapes are crisp on HiDPI (Retina) displays
-  ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  const baseCell = 70; // desired cell size
+  const desiredWidth = cols * baseCell + 40; // padding
+  const desiredHeight = rows * baseCell + 40;
 
-  // redraw everything after resize
+  // scale down if needed to fit screen
+  const scale = Math.min(maxWidth / desiredWidth, maxHeight / desiredHeight, 1);
+
+  // set panel size
+  container.style.width = `${desiredWidth * scale}px`;
+  container.style.height = `${desiredHeight * scale}px`;
+
+  // canvas HiDPI
+  canvas.width = desiredWidth * scale * window.devicePixelRatio;
+  canvas.height = desiredHeight * scale * window.devicePixelRatio;
+
+  ctx.setTransform(window.devicePixelRatio * scale, 0, 0, window.devicePixelRatio * scale, 0, 0);
+
   draw();
 }
 
+
 /* draw board simple 2D polished look */
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const pad = 20;
-  const availableW = canvas.width - pad*2;
-  const availableH = canvas.height - pad*2;
-  const cellW = Math.floor(Math.min(availableW/cols, availableH/rows));
-  const boardW = cellW * cols;
-  const boardH = cellW * rows;
-  const ox = (canvas.width - boardW)/2;
-  const oy = (canvas.height - boardH)/2;
-  // board background
-  roundRect(ctx, ox-8, oy-8, boardW+16, boardH+16, 12, '#04243b');
-  // slots
-  for (let r=0;r<rows;r++){
-    for (let c=0;c<cols;c++){
-      const x = ox + c*cellW;
-      const y = oy + r*cellW;
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const pad = 20;                 // padding around the board
+  const baseCell = 70;            // fixed cell size
+  const boardW = cols * baseCell;
+  const boardH = rows * baseCell;
+
+  // account for any canvas scaling
+  const transform = ctx.getTransform();
+  const ox = (canvas.width / transform.a - boardW) / 2;
+  const oy = (canvas.height / transform.d - boardH) / 2;
+
+  // draw board background with rounded corners
+  roundRect(ctx, ox - 8, oy - 8, boardW + 16, boardH + 16, 12, '#04243b');
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = ox + c * baseCell;
+      const y = oy + r * baseCell;
+
       // slot background
       ctx.fillStyle = '#001b2b';
-      ctx.fillRect(x+6, y+6, cellW-12, cellW-12);
+      ctx.fillRect(x + 6, y + 6, baseCell - 12, baseCell - 12);
+
       // token
       const v = board[r][c];
-      const cx = x + cellW/2;
-      const cy = y + cellW/2;
-      const rad = Math.floor(cellW*0.34);
-      if (v === 0){
-        // inner shadow circle
-        const g = ctx.createRadialGradient(cx-6, cy-8, 4, cx, cy, rad);
+      const cx = x + baseCell / 2;
+      const cy = y + baseCell / 2;
+      const rad = Math.floor(baseCell * 0.34);
+
+      if (v === 0) {
+        const g = ctx.createRadialGradient(cx - 6, cy - 8, 4, cx, cy, rad);
         g.addColorStop(0, '#002233');
         g.addColorStop(1, '#001221');
         ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(cx,cy,rad,0,Math.PI*2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+        ctx.fill();
       } else {
-        // colored token with shine
-        const palette = {1:['#ff6b6b','#c30000'],2:['#ffd86b','#c99e00'],3:['#6ea8fe','#2b6fd6'],4:['#7cf7c1','#00a65a']};
-        const col1 = palette[v][0], col2 = palette[v][1];
-        const g = ctx.createRadialGradient(cx-8, cy-10, 4, cx, cy, rad);
+        const palette = {
+          1: ['#ff6b6b', '#c30000'],
+          2: ['#ffd86b', '#c99e00'],
+          3: ['#6ea8fe', '#2b6fd6'],
+          4: ['#7cf7c1', '#00a65a']
+        };
+        const [col1, col2] = palette[v];
+        const g = ctx.createRadialGradient(cx - 8, cy - 10, 4, cx, cy, rad);
         g.addColorStop(0, col1);
         g.addColorStop(1, col2);
         ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(cx,cy,rad,0,Math.PI*2); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+        ctx.fill();
+
         // rim
         ctx.strokeStyle = 'rgba(0,0,0,0.25)';
         ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(cx,cy,rad,0,Math.PI*2); ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+        ctx.stroke();
       }
     }
   }
 }
+
 
 /* helpers for drawing */
 function roundRect(ctx,x,y,w,h,r,fill){

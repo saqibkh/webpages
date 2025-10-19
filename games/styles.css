@@ -10,18 +10,24 @@ body {
   backdrop-filter: blur(6px);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: width 0.2s, height 0.2s; /* smooth resizing */
+  overflow: hidden; /* prevent content overflow */
 }
 
+/* Canvas now grows with the panel */
 canvas {
   display: block;
   border-radius: 10px;
   background: #031022;
-  margin: 0 auto;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 3 / 2; /* keep proportions responsive */
+  margin: 0;
+  width: auto;       /* controlled by JS */
+  height: auto;      /* controlled by JS */
 }
 
+/* Buttons styling */
 .btn {
   padding: 0.4rem 0.7rem;
   border-radius: 0.4rem;
