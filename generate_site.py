@@ -26,7 +26,7 @@ def generate_projects_overview(projects):
         <div class="card">
             <strong>{proj['name']}</strong>
             <p>{proj['description']}</p>
-            <p>Visit: <a href="{proj['link']}" target="_blank">{proj['link']}</a></p>
+            <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
             <p><a href="projects/{filename}">Read More</a></p>
         </div>
         """
