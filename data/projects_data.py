@@ -42,6 +42,22 @@ projects = [
       "type": "application"
     },
     {
+      "name": "GeoLocation",
+      "description": "Share your exact location instantly - get precise GPS coordinates and a live map pin with one click.",
+      "link": "misc/geolocation/geolocation.html",
+      "Visit": "GeoLocation",
+      "details": "When you allow location access, this page reads your device’s GPS to display exact latitude and longitude and drop a live pin on an interactive map. We only request permission when needed and never store your coordinates without your explicit consent.",
+      "type": "application"
+    },
+    {
+      "name": "Pollix",
+      "description": "Create and share public polls effortlessly - generate links and QR codes for instant participation.",
+      "link": "misc/pollix/pollix.html",
+      "Visit": "Pollix",
+      "details": "Host interactive polls that anyone can join via a unique link or QR code. Track live results as votes come in, and manage your polls with customizable settings for anonymity, duration, and visibility. Perfect for quick feedback, group decisions, or event engagement.",
+      "type": "application"
+    },
+    {
         "name": "Intelligence-Lab Youtube Channel",
         "description": "My personal YouTube channel where I post tech-related content.",
         "link": "https://www.youtube.com/@Intelligence_Lab_SK",
