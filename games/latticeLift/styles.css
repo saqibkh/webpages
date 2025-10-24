@@ -34,3 +34,26 @@ canvas {
   font-weight: 600;
 }
 
+/* Winner banner */
+#winnerBanner.show {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+#winnerBanner.win-player-1 { background: linear-gradient(90deg, #ff6b6b, #c30000); }
+#winnerBanner.win-player-2 { background: linear-gradient(90deg, #ffd86b, #c99e00); }
+#winnerBanner.win-player-3 { background: linear-gradient(90deg, #6ea8fe, #2b6fd6); }
+#winnerBanner.win-player-4 { background: linear-gradient(90deg, #7cf7c1, #00a65a); }
+#winnerBanner.draw { background: #888888; }
+
+/* Optional bounce effect */
+@keyframes bounceIn {
+  0% { transform: translateX(-50%) scale(0.3); opacity: 0; }
+  60% { transform: translateX(-50%) scale(1.1); opacity: 1; }
+  80% { transform: translateX(-50%) scale(0.95); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+
+#winnerBanner.show {
+  animation: bounceIn 0.7s forwards;
+}
