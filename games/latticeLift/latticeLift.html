@@ -67,6 +67,9 @@
     </aside>
   </main>
 
+  <!-- Winner banner -->
+  <div id="winnerBanner" class="fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg text-white text-xl font-bold shadow-lg opacity-0 pointer-events-none transition-all duration-700 scale-0 z-50"></div>
+
 <script>
 /* =========================
    Game + Rendering (Canvas 2D simplified)
@@ -316,10 +319,30 @@ function isBoardFull(b){
 }
 
 function updateStatus(){
+  const banner = document.getElementById('winnerBanner');
+
   if (winner !== null){
-    if (winner === -1){ statusText.textContent = 'Draw'; resultText.textContent = 'Game ended in a draw.'; }
-    else { statusText.textContent = `Player ${winner} wins!`; resultText.textContent = `Player ${winner} won — nice!`; }
-  } else { statusText.textContent = `Current turn: Player ${currentPlayer}`; resultText.textContent=''; }
+    if (winner === -1){
+      statusText.textContent = 'Draw';
+      resultText.textContent = 'Game ended in a draw.';
+      banner.textContent = 'Draw!';
+      banner.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg text-white text-xl font-bold shadow-lg opacity-0 pointer-events-none transition-all duration-700 scale-0 z-50 draw show';
+    } else {
+      statusText.textContent = `Player ${winner} wins!`;
+      resultText.textContent = `Player ${winner} won — nice!`;
+      banner.textContent = `🎉 Player ${winner} Wins! 🎉`;
+      banner.className = `fixed top-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg text-white text-xl font-bold shadow-lg opacity-0 pointer-events-none transition-all duration-700 scale-0 z-50 win-player-${winner} show`;
+    }
+
+    // hide banner after 3 seconds
+    setTimeout(() => {
+      banner.classList.remove('show');
+    }, 3000);
+
+  } else {
+    statusText.textContent = `Current turn: Player ${currentPlayer}`;
+    resultText.textContent = '';
+  }
 }
 
 /* =========================
@@ -619,16 +642,6 @@ function gameLoop(){
   requestAnimationFrame(gameLoop);
 }
 gameLoop();
-
-function updateStatus(){
-  if (winner !== null){
-    if (winner === -1){ statusText.textContent = 'Draw'; resultText.textContent = 'Draw'; }
-    else { statusText.textContent = `Player ${winner} wins!`; resultText.textContent = `Player ${winner} won`; }
-  } else {
-    statusText.textContent = `Current turn: Player ${currentPlayer}`;
-    resultText.textContent = '';
-  }
-}
 
 /* =========================
    Player move handling (hotseat)

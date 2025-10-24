@@ -21,15 +21,26 @@ def generate_projects_overview(projects):
 """ + generate_navbar() + "<section>"
 
     for proj in projects:
-        filename = proj['name'].lower().replace(" ", "_") + ".html"
-        html += f"""
-        <div class="card">
-            <strong>{proj['name']}</strong>
-            <p>{proj['description']}</p>
-            <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
-            <p><a href="projects/{filename}">Read More</a></p>
-        </div>
-        """
+        if proj.get("type") == "application":
+          filename = proj['name'].lower().replace(" ", "_") + ".html"
+          html += f"""
+          <div class="card">
+              <strong>{proj['name']}</strong>
+              <p>{proj['description']}</p>
+              <p>{proj['details']}</p>
+              <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
+          </div>
+          """
+        else:
+          filename = proj['name'].lower().replace(" ", "_") + ".html"
+          html += f"""
+          <div class="card">
+              <strong>{proj['name']}</strong>
+              <p>{proj['description']}</p>
+              <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
+              <p><a href="projects/{filename}">Read More</a></p>
+          </div>
+          """
 
     html += f"""
 </section>
