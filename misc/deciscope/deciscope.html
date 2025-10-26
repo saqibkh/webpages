@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>DeciScope — Web Sound Level Meter</title>
+<style>
+  :root{
+    --bg:#0f1724; --card:#0b1220; --accent:#00d1ff; --muted:#9aa6b2; --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#071025 0%, #071733 60%);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
+  .app{max-width:1100px;margin:24px auto;padding:20px;border-radius:14px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));box-shadow:0 5px 30px rgba(2,6,23,0.6);color:#e6eef6;}
+  header{display:flex;gap:16px;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c5cff);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;color:#022;}
+  h1{font-size:20px;margin:0}
+  p.lead{margin:0;color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns: 1fr 360px; gap:18px;margin-top:18px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+  .meterLarge{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px}
+  .dbValue{font-size:48px;font-weight:700;letter-spacing:-1px}
+  .units{font-size:14px;color:var(--muted)}
+  .barWrap{width:100%;height:22px;background:rgba(255,255,255,0.03);border-radius:12px;overflow:hidden;display:flex;align-items:center}
+  .bar{height:100%;width:0%;background:linear-gradient(90deg,var(--good),var(--warn));transition:width 0.08s linear}
+  .bar.red{background:linear-gradient(90deg,var(--warn),var(--bad))}
+  .smallStats{display:flex;gap:10px;margin-top:10px;justify-content:space-between;color:var(--muted);font-size:13px}
+  canvas{width:100%;height:120px;background:linear-gradient(180deg, rgba(0,0,0,0.12), rgba(255,255,255,0.01));border-radius:8px}
+  .controls{display:flex;flex-direction:column;gap:10px}
+  .row{display:flex;gap:8px;align-items:center}
+  label{font-size:13px;color:var(--muted)}
+  input[type=range]{width:100%}
+  .btn{background:var(--accent);color:#012;padding:8px 12px;border-radius:8px;border:none;font-weight:700;cursor:pointer}
+  /* Logging & ready states */
+  .btn.logging {
+    background: var(--good); /* green tone while logging */
+    color: #012;
+    box-shadow: 0 0 6px rgba(34,197,94,0.5);
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+    50% { box-shadow: 0 0 12px rgba(34,197,94,0.8); }
+    100% { box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+  }
+
+  .btn.logging {
+    animation: pulse 1.5s infinite;
+  }
+
+  .btn.ready {
+    background: var(--accent); /* cyan tone when CSV is ready */
+    color: #012;
+    box-shadow: 0 0 6px rgba(0,209,255,0.5);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+  .muted{color:var(--muted);font-size:13px}
+  .switch{display:inline-flex;align-items:center;gap:8px}
+  .toggle{width:46px;height:26px;background:#1f2937;border-radius:20px;position:relative;padding:3px;cursor:pointer}
+  .toggle .knob{width:20px;height:20px;background:#e6eef6;border-radius:50%;position:absolute;left:3px;top:3px;transition:left 0.15s}
+  .toggle.on{background:linear-gradient(90deg,var(--accent),#7c5cff)}
+  select,input[type=number],button{font-size:13px;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--muted)}
+  .footer{margin-top:14px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;align-items:center}
+  .note{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;font-size:13px;color:var(--muted)}
+  .topControls{display:flex;gap:8px;align-items:center}
+  .history{height:140px;border-radius:8px;overflow:hidden}
+  .compact{font-size:13px;color:var(--muted)}
+  @media (max-width:900px){ .grid{grid-template-columns: 1fr; } .logo{display:none} }
+</style>
+</head>
+<body>
+  <div class="app" role="main">
+    <header>
+      <div class="brand">
+        <div class="logo">DS</div>
+        <div>
+          <h1>DeciScope</h1>
+          <p class="lead">Realtime web sound-level meter — simple, visual, and calibratable.</p>
+        </div>
+      </div>
+      <div class="topControls">
+        <button id="startBtn" class="btn">Start</button>
+        <button id="stopBtn" class="btn secondary" disabled>Stop</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT (main) -->
+      <div class="card">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1">
+            <div class="meterLarge">
+              <div class="dbValue" id="dbDisplay">—</div>
+              <div class="units">dB SPL (approx.) <span id="weightLabel" class="muted">[Unweighted]</span></div>
+              <div style="width:100%;margin-top:8px">
+                <div class="barWrap"><div id="levelBar" class="bar"></div></div>
+              </div>
+              <div class="smallStats">
+                <div>Peak: <strong id="peakDisp">—</strong></div>
+                <div>Min: <strong id="minDisp">—</strong></div>
+                <div>Max: <strong id="maxDisp">—</strong></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="width:260px">
+            <div class="controls">
+              <div class="row">
+                <label for="weightSelect">Weighting</label>
+                <select id="weightSelect">
+                  <option value="none">None (dB)</option>
+                  <option value="A">A-weighting (dBA)</option>
+                </select>
+              </div>
+
+              <div class="row">
+                <label title="Adjust to match a reference SPL meter. Typical starting guess: 94 dB @ 1kHz corresponds to 0 dBFS">Calibration offset (dB)</label>
+                <input id="calib" type="number" value="94" step="0.1" style="width:100px"/>
+                <div class="muted" style="margin-left:auto">SPL value assigned to 0 dBFS</div>
+              </div>
+
+              <div class="row">
+                <label title="Shorter window = faster updates.">Window (ms)</label>
+                <input id="winRange" type="range" min="50" max="1000" value="200"/>
+                <div class="muted" id="winVal">200 ms</div>
+              </div>
+
+              <div class="row" style="justify-content:space-between">
+                <button id="holdBtn" class="btn secondary">Hold Peak</button>
+                <button id="resetBtn" class="btn secondary">Reset Min/Max</button>
+              </div>
+
+              <div class="row" style="justify-content:space-between">
+                <button id="startLog" class="btn">Start Log</button>
+                <button id="stopLog" class="btn secondary" disabled>Stop Log</button>
+                <button id="downloadCSV" class="btn secondary" disabled>Download CSV</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;display:grid;grid-template-columns:1fr 220px;gap:12px">
+          <div>
+            <label class="compact">Waveform (time domain)</label>
+            <canvas id="waveCanvas" height="120"></canvas>
+          </div>
+          <div>
+            <label class="compact">History (last 30s)</label>
+            <canvas id="histCanvas" height="120" class="history"></canvas>
+          </div>
+        </div>
+
+        <div class="footer">
+          <div class="note">Tip: To calibrate, compare with a reference SPL meter or a calibration tone and adjust the "Calibration offset (dB)" until readings match.</div>
+          <div class="compact">Microphone permission required • Works on HTTPS / localhost</div>
+        </div>
+      </div>
+
+      <!-- RIGHT (sidebar) -->
+      <div class="card">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <strong>Realtime info</strong>
+            <div class="muted" style="margin-top:8px">Instant RMS → dB calculation (dBFS) plus calibration offset. A-weighting applies frequency-domain weights.</div>
+          </div>
+
+          <div>
+            <label>Device / Sample Rate</label>
+            <div id="deviceInfo" class="muted">Not started</div>
+          </div>
+
+          <div>
+            <label>Sampling settings</label>
+            <div class="muted">FFT size: <span id="fftSize">1024</span> • Update rate from window</div>
+          </div>
+
+          <div>
+            <label>Recorded stats</label>
+            <div style="margin-top:8px;color:var(--muted)">
+              Readings logged: <strong id="logCount">0</strong><br/>
+              Last saved CSV contains timestamp and dB value.
+            </div>
+          </div>
+
+          <div>
+            <label>About accuracy</label>
+            <div class="muted" style="margin-top:8px">
+              Browser mic → relative levels. Calibration required for absolute SPL. Environmental factors & mic quality affect accuracy.
+            </div>
+          </div>
+
+          <div>
+            <label>Quick actions</label>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button id="toggleWeightHelp" class="btn secondary">Weighting Info</button>
+              <button id="clearLog" class="btn secondary">Clear Log</button>
+            </div>
+          </div>
+
+          <div class="note" id="helpBox" style="display:none">
+            A-weighting approximates human hearing sensitivity (reduces low freq energy). Use when measuring perceived loudness (e.g., environmental noise).
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(async function(){
+  // UI elements
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const dbDisplay = document.getElementById('dbDisplay');
+  const levelBar = document.getElementById('levelBar');
+  const weightSelect = document.getElementById('weightSelect');
+  const weightLabel = document.getElementById('weightLabel');
+  const calibInput = document.getElementById('calib');
+  const winRange = document.getElementById('winRange');
+  const winVal = document.getElementById('winVal');
+  const waveCanvas = document.getElementById('waveCanvas');
+  const histCanvas = document.getElementById('histCanvas');
+  const peakDisp = document.getElementById('peakDisp');
+  const minDisp = document.getElementById('minDisp');
+  const maxDisp = document.getElementById('maxDisp');
+  const holdBtn = document.getElementById('holdBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const deviceInfo = document.getElementById('deviceInfo');
+  const fftSizeLabel = document.getElementById('fftSize');
+  const startLog = document.getElementById('startLog');
+  const stopLog = document.getElementById('stopLog');
+  const downloadCSV = document.getElementById('downloadCSV');
+  const logCount = document.getElementById('logCount');
+  const toggleWeightHelp = document.getElementById('toggleWeightHelp');
+  const helpBox = document.getElementById('helpBox');
+  const clearLog = document.getElementById('clearLog');
+
+  // Canvas contexts & sizing
+  const wctx = waveCanvas.getContext('2d');
+  const hctx = histCanvas.getContext('2d');
+  function resizeCanvases(){
+    [waveCanvas, histCanvas].forEach(c=>{
+      const dpr = window.devicePixelRatio || 1;
+      const rect = c.getBoundingClientRect();
+      c.width = rect.width * dpr;
+      c.height = rect.height * dpr;
+      c.style.width = rect.width + 'px';
+      c.style.height = rect.height + 'px';
+      const ctx = c.getContext('2d');
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    });
+  }
+  window.addEventListener('resize', resizeCanvases);
+  resizeCanvases();
+
+  // Audio vars
+  let audioCtx = null;
+  let analyser = null;
+  let sourceNode = null;
+  let micStream = null;
+  let freqDataArray = null;
+  let timeArray = null;
+  let rafId = null;
+  let fftSize = 2048; // default analyzer FFT size
+  fftSizeLabel.textContent = fftSize;
+
+  // Stats & history
+  let peak = -Infinity, minVal = Infinity, maxVal = -Infinity;
+  let holdPeak = false;
+  let history = []; // {t, db}
+  const historyWindow = 30 * 1000; // 30 seconds
+  let logging = false;
+  let logData = [];
+
+  // A-weighting weights (linear power multipliers per frequency bin)
+  let aWeighting = null;
+
+  // Utility functions
+  function clamp(v,a,b){return Math.max(a, Math.min(b, v));}
+  function formatDb(v){
+    if(!isFinite(v)) return '—';
+    return v.toFixed(1);
+  }
+
+  // A-weighting function (returns dB weighting per frequency in Hz)
+  // Approximation based on standard A-weighting formula
+  function aWeightDbAtFreq(f){
+    // avoid f=0 -> return large negative (very attenuated)
+    if(f <= 0) return -1000;
+    const f2 = f*f;
+    const ra = (12194*12194 * f2*f2) / ((f2 + 20.6*20.6) * (f2 + 12194*12194) * Math.sqrt((f2 + 107.7*107.7)*(f2 + 737.9*737.9)));
+    const A = 20 * Math.log10(ra) + 2.00; // normalized so A(1000 Hz) ≈ 0 dB
+    return A;
+  }
+
+  // Precompute A-weighting multipliers (power domain) for analyzer bins
+  function computeAWeightingForBins(sampleRate, fftSz){
+    const bins = fftSz / 2;
+    const weights = new Float32Array(bins);
+    for(let i=0;i<bins;i++){
+      // frequency for bin i:
+      const f = i * sampleRate / fftSz;
+      const AdB = aWeightDbAtFreq(f);
+      // convert to linear power multiplier (10^(A_dB / 10))
+      weights[i] = Math.pow(10, AdB / 10);
+    }
+    return weights;
+  }
+
+  // Start/stop
+  async function start(){
+    if(audioCtx) return;
+    try {
+      const constraints = { audio: { echoCancellation: true, noiseSuppression: true, sampleRate: { ideal: 48000 } } };
+      micStream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch(err){
+      alert('Microphone access denied or not available.\nPlease allow microphone and use HTTPS or localhost.');
+      console.error(err);
+      return;
+    }
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = fftSize; // 2048
+    analyser.smoothingTimeConstant = 0.2;
+    fftSizeLabel.textContent = analyser.fftSize;
+
+    sourceNode = audioCtx.createMediaStreamSource(micStream);
+    sourceNode.connect(analyser);
+
+    freqDataArray = new Float32Array(analyser.frequencyBinCount);
+    timeArray = new Float32Array(analyser.fftSize);
+
+    // compute A-weighting for bins now that we have sample rate and fft size
+    aWeighting = computeAWeightingForBins(audioCtx.sampleRate, analyser.fftSize);
+
+    deviceInfo.textContent = `${getLabelForStream(micStream)} • ${Math.round(audioCtx.sampleRate)} Hz`;
+
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+
+    // kick off update loop
+    scheduleUpdate();
+  }
+
+  function stop(){
+    if(!audioCtx) return;
+    cancelAnimationFrame(rafId);
+    if(sourceNode) sourceNode.disconnect();
+    if(analyser) analyser.disconnect();
+    if(micStream){
+      micStream.getTracks().forEach(t=>t.stop());
+      micStream = null;
+    }
+    audioCtx.close();
+    audioCtx = null;
+    sourceNode = null;
+    analyser = null;
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    deviceInfo.textContent = 'Stopped';
+    dbDisplay.textContent = '—';
+    levelBar.style.width = '0%';
+  }
+
+  function getLabelForStream(stream){
+    try {
+      const track = stream.getAudioTracks()[0];
+      if(!track) return 'Microphone';
+      const label = track.label || 'Microphone';
+      return label;
+    } catch(e){
+      return 'Microphone';
+    }
+  }
+
+  // compute RMS from time domain (simple, reliable)
+  function computeRmsFromTimeDomain(){
+    analyser.getFloatTimeDomainData(timeArray);
+    let sum = 0;
+    for(let i=0;i<timeArray.length;i++){
+      const s = timeArray[i];
+      sum += s*s;
+    }
+    const rms = Math.sqrt(sum / timeArray.length);
+    return rms;
+  }
+
+  // compute weighted (A) dB using frequency bins (power-sum with weighting)
+  // Returns dBFS (decibels relative to full-scale) where 0 dBFS = max
+  function computeWeightedDb(){
+    // Get frequency data in dB (per bin, dBFS)
+    analyser.getFloatFrequencyData(freqDataArray); // values in dB (relative to full scale amplitude)
+    let powerSum = 0;
+    for(let i=0;i<freqDataArray.length;i++){
+      const db = freqDataArray[i];
+      if(!isFinite(db)) continue;
+      // Convert dB (amplitude) to power: power = 10^(dB/10)
+      const power = Math.pow(10, db / 10);
+      // apply A-weighting (power multiplier)
+      const w = aWeighting ? aWeighting[i] : 1;
+      powerSum += power * w;
+    }
+    if(powerSum <= 0) return -Infinity;
+    // total power in dB relative to full-scale power:
+    const dbfs_power = 10 * Math.log10(powerSum);
+    // dbfs_power is in dB power units; for single-channel RMS amplitude dBFS you'd often use 10*log10(mean_square).
+    // This value is already comparable to 10*log10(mean_square). We'll return dbfs_power.
+    return dbfs_power;
+  }
+
+  // update loop
+  function scheduleUpdate(){
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function loop(){
+    // Determine window requested (this is informative; analyser smoothing/time window is separate)
+    const winMs = Number(winRange.value);
+    winVal.textContent = `${winMs} ms`;
+
+    if(!analyser) return;
+
+    // Time-domain RMS -> dBFS
+    const rms = computeRmsFromTimeDomain();
+    const dbfs_time = 20 * Math.log10(rms || Number.EPSILON); // dBFS amplitude
+
+    // Optionally compute A-weighted dBFS from freq domain
+    const weighting = weightSelect.value;
+    let usedDbfs = dbfs_time;
+    if(weighting === 'A'){
+      const wdb = computeWeightedDb();
+      if(isFinite(wdb)) usedDbfs = wdb;
+    }
+
+    // apply calibration offset: treat calib input as "SPL at 0 dBFS"
+    // i.e. SPL = dBFS + calibValue
+    const calib = parseFloat(calibInput.value) || 0;
+    const dbSPL = usedDbfs + calib;
+
+    // update UI
+    dbDisplay.textContent = formatDb(dbSPL);
+    weightLabel.textContent = (weighting === 'A') ? '[A-weighted]' : '[Unweighted]';
+
+    // bar: map range from 20 dB to 110 dB for visual (subjective)
+    const barMin = 20, barMax = 110;
+    const pct = clamp((dbSPL - barMin) / (barMax - barMin), 0, 1) * 100;
+    levelBar.style.width = pct + '%';
+    // color change
+    if(dbSPL >= 85) levelBar.classList.add('red'); else levelBar.classList.remove('red');
+
+    // min/max/peak
+    if(dbSPL > maxVal) maxVal = dbSPL;
+    if(dbSPL < minVal) minVal = dbSPL;
+    if(dbSPL > peak) peak = dbSPL;
+    if(!holdPeak) peakDisp.textContent = formatDb(peak);
+    minDisp.textContent = isFinite(minVal)?formatDb(minVal):'—';
+    maxDisp.textContent = isFinite(maxVal)?formatDb(maxVal):'—';
+    if(holdPeak) peakDisp.textContent = 'HOLD';
+
+    // push history (timestamp and db)
+    const now = Date.now();
+    history.push({t:now, db:dbSPL});
+    // prune
+    const cutoff = now - historyWindow;
+    while(history.length && history[0].t < cutoff) history.shift();
+
+    // draw waveform & history
+    drawWaveform();
+    drawHistory();
+
+    // logging
+    if(logging){
+      logData.push({t:now, db:dbSPL});
+      logCount.textContent = logData.length;
+    }
+
+    // schedule next
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function drawWaveform(){
+    const ctx = wctx;
+    const canvas = waveCanvas;
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0,0,rect.width,rect.height);
+    // draw midline
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillRect(0,0,rect.width,rect.height);
+    analyser.getFloatTimeDomainData(timeArray);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(0,209,255,0.9)';
+    ctx.beginPath();
+    const step = Math.max(1, Math.floor(timeArray.length / rect.width));
+    const midY = rect.height/2;
+    for(let i=0;i<timeArray.length;i+=step){
+      const x = (i / timeArray.length) * rect.width;
+      const y = midY + timeArray[i]*midY;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  function drawHistory(){
+    const ctx = hctx;
+    const canvas = histCanvas;
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0,0,rect.width,rect.height);
+    // background
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(0,0,rect.width,rect.height);
+
+    const now = Date.now();
+    const cutoff = now - historyWindow;
+    const visible = history.filter(h=>h.t >= cutoff);
+    if(visible.length < 2) return;
+    // compute x positions
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(124,92,255,0.95)';
+    ctx.beginPath();
+    for(let i=0;i<visible.length;i++){
+      const x = ((visible[i].t - cutoff) / historyWindow) * rect.width;
+      const yPct = clamp((visible[i].db - 20) / 100, 0, 1); // map 20..120
+      const y = rect.height - yPct * rect.height;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    // draw recent dot
+    const last = visible[visible.length-1];
+    const lastX = ((last.t - cutoff) / historyWindow) * rect.width;
+    const lastYPct = clamp((last.db - 20) / 100, 0, 1);
+    const lastY = rect.height - lastYPct * rect.height;
+    ctx.fillStyle = 'rgba(0,209,255,0.95)';
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Controls
+  startBtn.addEventListener('click', ()=>start());
+  stopBtn.addEventListener('click', ()=>stop());
+  weightSelect.addEventListener('change', ()=>{ weightLabel.textContent = weightSelect.value === 'A' ? '[A-weighted]' : '[Unweighted]'; });
+  winRange.addEventListener('input', ()=>{ winVal.textContent = `${winRange.value} ms`; });
+
+  holdBtn.addEventListener('click', ()=>{
+    holdPeak = !holdPeak;
+    holdBtn.textContent = holdPeak ? 'Release Hold' : 'Hold Peak';
+    if(!holdPeak){
+      // on release, reset peak to current max so UI updates smoothly
+      peak = maxVal;
+      peakDisp.textContent = formatDb(peak);
+    } else {
+      peakDisp.textContent = 'HOLD';
+    }
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    peak = -Infinity; minVal = Infinity; maxVal = -Infinity;
+    peakDisp.textContent = '—'; minDisp.textContent = '—'; maxDisp.textContent = '—';
+  });
+
+  toggleWeightHelp.addEventListener('click', ()=>{
+    helpBox.style.display = helpBox.style.display === 'none' ? 'block' : 'none';
+  });
+
+  // logging
+  startLog.addEventListener('click', ()=>{
+    if(!audioCtx){
+      alert('Please click Start to enable the microphone before logging.');
+      return;
+    }
+    logging = true;
+    logData = [];
+    startLog.disabled = true;
+    stopLog.disabled = false;
+    downloadCSV.disabled = true;
+
+    // add visual feedback
+    startLog.classList.add('logging');
+    startLog.textContent = 'Logging...';
+    stopLog.classList.remove('ready');
+    downloadCSV.classList.remove('ready');
+  });
+
+
+  stopLog.addEventListener('click', ()=>{
+    logging = false;
+    startLog.disabled = false;
+    stopLog.disabled = true;
+    downloadCSV.disabled = logData.length === 0;
+
+    // reset start log visuals
+    startLog.classList.remove('logging');
+    startLog.textContent = 'Start Log';
+
+    // highlight download button when data ready
+    if(logData.length > 0){
+      downloadCSV.classList.add('ready');
+    }
+  });
+
+  clearLog.addEventListener('click', ()=>{
+    logData = []; logCount.textContent = '0'; downloadCSV.disabled = true;
+  });
+
+
+  downloadCSV.addEventListener('click', ()=>{
+    if(logData.length === 0) return;
+    const rows = [['timestamp_iso','timestamp_ms','db_spl']];
+    for(const r of logData){
+      rows.push([new Date(r.t).toISOString(), String(r.t), String(r.db.toFixed(2))]);
+    }
+    const csv = rows.map(r=>r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'deciscope_log.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // reset visual state after download
+    downloadCSV.classList.remove('ready');
+    downloadCSV.disabled = true;
+  });
+
+  // update log count display continuously
+  setInterval(()=>{ logCount.textContent = logData.length; }, 500);
+
+  // helpers to stop audio when leaving
+  window.addEventListener('pagehide', ()=>stop());
+  window.addEventListener('beforeunload', ()=>stop());
+
+  // initialize some UI defaults
+  winVal.textContent = `${winRange.value} ms`;
+
+  // Friendly fallback if no microphone support
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    startBtn.disabled = true;
+    alert('getUserMedia() not supported in this browser. Use recent Chrome/Firefox on desktop or mobile.');
+  }
+
+})();
+</script>
+</body>
+</html>
+
