@@ -37,6 +37,16 @@
     box-shadow: 0 0 6px rgba(34,197,94,0.5);
   }
 
+  @keyframes pulse {
+    0% { box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+    50% { box-shadow: 0 0 12px rgba(34,197,94,0.8); }
+    100% { box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+  }
+
+  .btn.logging {
+    animation: pulse 1.5s infinite;
+  }
+
   .btn.ready {
     background: var(--accent); /* cyan tone when CSV is ready */
     color: #012;
