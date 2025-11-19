@@ -17,4 +17,4 @@ skills = {
     "Tools & Technologies": ["CUDA", "ROCm", "Git", "Linux", "Jupyter", "PyTorch", "HPC Simulation Tools"]
 }
 
-hobbies = ["Spending time with my son", "Playing cricket", "Playing football"]
+hobbies = ["Spending time with my son", "Playing cricket and football"]

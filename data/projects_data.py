@@ -15,7 +15,7 @@ projects = [
       "link": "misc/deciscope/deciscope.html",
       "Visit": "DeciScope",
       "details": (
-          "Realtime web sound-level meter — simple, visual, and calibratable."
+          "A lightweight, browser-based sound level meter that’s simple to use, visually immediate, and can be calibrated so readings approximate true dB SPL. Target: casual users, venue staff, podcasters, hobbyists, and developers who want an embeddable, privacy-friendly SPL tool."
         ),
       "type": "application"
     },
