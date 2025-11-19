@@ -69,13 +69,6 @@ def generate_about_me_page():
 </section>
 
 <section>
-    <h2>Contact</h2>
-    <div class="card">
-        <p>Email: <a href='mailto:{email}'>{email}</a></p>
-    </div>
-</section>
-
-<section>
     <h2>Hobbies / Fun</h2>
     <div class="card">
         <ul>{hobbies_html}</ul>
