@@ -38,7 +38,7 @@ def generate_projects_overview(projects):
               <strong>{proj['name']}</strong>
               <p>{proj['description']}</p>
               <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
-              <p><a href="projects/{filename}">Read More</a></p>
+              <p><a href="{filename}">Read More</a></p>
           </div>
           """
 
