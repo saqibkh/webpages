@@ -2,7 +2,7 @@ def generate_navbar(relative_path=""):
     return f"""
 <nav>
     <a href="{relative_path}">About Me</a>
-    <a href="{relative_path}projects.html">Projects</a>
+    <a href="{relative_path}projects">Projects</a>
 </nav>
 <style>
 nav {{ display:flex; justify-content:center; background:white; box-shadow:0 2px 5px rgba(0,0,0,0.1); position:sticky; top:0; z-index:100; }}
