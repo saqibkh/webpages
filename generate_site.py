@@ -14,7 +14,7 @@ def generate_projects_overview(projects):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Projects</title>
-<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="../assets/css/styles.css">
 </head>
 <body>
 <header><h1>Projects</h1></header>
@@ -73,8 +73,8 @@ def main():
         print(f"Generated projects/{filename}")
 
     # Generate projects overview page
-    write_file("projects.html", generate_projects_overview(projects))
-    print("Generated projects.html (Projects Overview page)")
+    write_file("projects/index.html", generate_projects_overview(projects))
+    print("Generated projects/index.html (Projects Overview page)")
 
 if __name__ == "__main__":
     main()
