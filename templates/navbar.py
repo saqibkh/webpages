@@ -1,8 +1,8 @@
 def generate_navbar(relative_path=""):
     return f"""
 <nav>
-    <a href="/">About Me</a>
-    <a href="/projects">Projects</a>
+    <a href="https://khansaqib.com/">About Me</a>
+    <a href="https://khansaqib.com/projects">Projects</a>
 </nav>
 <style>
 nav {{ display:flex; justify-content:center; background:white; box-shadow:0 2px 5px rgba(0,0,0,0.1); position:sticky; top:0; z-index:100; }}
