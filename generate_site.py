@@ -2,9 +2,57 @@ from utils.file_utils import setup_directories, write_file
 from utils.css_template import css_content
 from templates.about_page import generate_about_me_page
 from templates.project_page import generate_project_page
+from templates.app_page import generate_app_page
 from templates.navbar import generate_navbar
 from data.personal_info import name, github, linkedin
 from data.projects_data import projects
+from data.apps_data import apps
+
+def generate_apps_overview(apps):
+    html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apps</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body>
+<header><h1>Apps</h1></header>
+""" + generate_navbar() + "<section>"
+
+    for app in apps:
+        if proj.get("type") == "application":
+          filename = proj['name'].lower().replace(" ", "_") + ".html"
+          html += f"""
+          <div class="card">
+              <strong>{proj['name']}</strong>
+              <p>{proj['description']}</p>
+              <p>{proj['details']}</p>
+              <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
+          </div>
+          """
+        else:
+          filename = proj['name'].lower().replace(" ", "_") + ".html"
+          html += f"""
+          <div class="card">
+              <strong>{proj['name']}</strong>
+              <p>{proj['description']}</p>
+              <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
+              <p><a href="https://khansaqib.com/projects/{filename}">Read More</a></p>
+          </div>
+          """
+
+    html += f"""
+</section>
+<footer>
+    &copy; 2025 {name} | <a href="{github}" target="_blank">GitHub</a> | <a href="{linkedin}" target="_blank">LinkedIn</a>
+</footer>
+</body>
+</html>
+"""
+    return html
 
 def generate_projects_overview(projects):
     html = """
@@ -65,6 +113,7 @@ def main():
 
     # Generate individual project pages
     for proj in projects:
+        print(f"proj={proj}")
         if proj.get("type") == "application":
             print(f"Skipped generating page for {proj['name']} (manual file in place)")
             continue
