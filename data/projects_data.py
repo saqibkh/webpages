@@ -2,7 +2,7 @@ projects = [
     {
       "name": "Advanced Browser System Benchmark",
       "description": "A browser-based benchmark that measures CPU, memory, GPU, storage, network, and overall system performance.",
-      "link": "https://khansaqib.com/projects/misc/advanced_browser_system_benchmark",
+      "link": "misc/advanced_browser_system_benchmark",
       "Visit": "Advanced Browser System Benchmark",
       "details": (
           "This application runs a series of tests directly in your browser to evaluate your computer’s hardware capabilities. It measures CPU speed via intensive math operations, memory bandwidth by reading/writing large arrays, GPU performance with WebGL frame rendering, storage throughput using local storage, and network speed with ping and download tests. Results are displayed with progress bars, charts, and can be exported as JSON or CSV for further analysis. All tests are safe, non-blocking, and can be stopped mid-run."
@@ -12,7 +12,7 @@ projects = [
     { 
       "name": "DeciScope",
       "description": "Realtime web sound-level meter — simple, visual, and calibratable.",
-      "link": "https://khansaqib.com/projects/misc/deciscope",
+      "link": "misc/deciscope",
       "Visit": "DeciScope",
       "details": (
           "A lightweight, browser-based sound level meter that’s simple to use, visually immediate, and can be calibrated so readings approximate true dB SPL. Target: casual users, venue staff, podcasters, hobbyists, and developers who want an embeddable, privacy-friendly SPL tool."
@@ -23,7 +23,7 @@ projects = [
       "name": "LatticeLift",
       "description": "LatticeLift is an advanced Connect-4 variant with AI opponents and customizable board settings.",
       "Visit": "Lattice Lift",
-      "link": "https://khansaqib.com/projects/games/latticeLift",
+      "link": "games/latticeLift",
       "details": (
           "Players take turns dropping tokens into a grid, aiming to connect a line of tokens horizontally, vertically, or diagonally. The game supports multiple human players or challenging AI opponents with configurable difficulty levels. Board size, number of rows, columns, and the required tokens to connect can be customized for varied gameplay. The interface features smooth canvas rendering and interactive controls for a polished experience."
         ),
@@ -33,7 +33,7 @@ projects = [
     {
       "name": "Paddle Smash",
       "description": "A visually enhanced block-breaking game with multiple levels, paddle control, and real-time scoring.",
-      "link": "https://khansaqib.com/projects/games/paddleSmash",
+      "link": "games/paddleSmash",
       "Visit": "Paddle Smash",
       "details": (
             "Paddle Smash allows users to select levels from 1 to 10, with increasing ball speed and decreasing paddle size. "
@@ -45,7 +45,7 @@ projects = [
     {
       "name": "Calculator",
       "description": "A simple interactive calculator built with HTML, CSS, and JavaScript.",
-      "link": "https://khansaqib.com/projects/misc/calculator",
+      "link": "misc/calculator",
       "Visit": "Calculator",
       "details": "An in-browser calculator to perform basic arithmetic operations.",
       "type": "application"
@@ -53,7 +53,7 @@ projects = [
     {
       "name": "GeoLocation",
       "description": "Share your exact location instantly - get precise GPS coordinates and a live map pin with one click.",
-      "link": "https://khansaqib.com/projects/misc/geolocation",
+      "link": "misc/geolocation",
       "Visit": "GeoLocation",
       "details": "When you allow location access, this page reads your device’s GPS to display exact latitude and longitude and drop a live pin on an interactive map. We only request permission when needed and never store your coordinates without your explicit consent.",
       "type": "application"
@@ -61,7 +61,7 @@ projects = [
     {
       "name": "Pollix",
       "description": "Create and share public polls effortlessly - generate links and QR codes for instant participation.",
-      "link": "https://khansaqib.com/projects/misc/pollix",
+      "link": "misc/pollix",
       "Visit": "Pollix",
       "details": "Host interactive polls that anyone can join via a unique link or QR code. Track live results as votes come in, and manage your polls with customizable settings for anonymity, duration, and visibility. Perfect for quick feedback, group decisions, or event engagement.",
       "type": "application"

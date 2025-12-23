@@ -1,94 +1,60 @@
+import os
+import sys
 from utils.file_utils import setup_directories, write_file
 from utils.css_template import css_content
 from templates.about_page import generate_about_me_page
 from templates.project_page import generate_project_page
 from templates.app_page import generate_app_page
+from templates.overview_apps import generate_apps_overview
 from templates.navbar import generate_navbar
 from data.personal_info import name, github, linkedin
 from data.projects_data import projects
 from data.apps_data import apps
 
-def generate_apps_overview(apps):
-    html = """
+def generate_overview(items, page_title, is_project=True, navbar=""):
+    """
+    Generic overview page generator.
+    items: list of dictionaries (projects or apps)
+    page_title: string, page heading
+    is_project: if True, assume it's projects; otherwise, apps
+    navbar: HTML string for the navigation bar
+    """
+    html = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Apps</title>
+<title>{page_title}</title>
 <link rel="stylesheet" href="../assets/css/styles.css">
 </head>
 <body>
-<header><h1>Apps</h1></header>
-""" + generate_navbar() + "<section>"
-
-    for app in apps:
-        if proj.get("type") == "application":
-          filename = proj['name'].lower().replace(" ", "_") + ".html"
-          html += f"""
-          <div class="card">
-              <strong>{proj['name']}</strong>
-              <p>{proj['description']}</p>
-              <p>{proj['details']}</p>
-              <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
-          </div>
-          """
-        else:
-          filename = proj['name'].lower().replace(" ", "_") + ".html"
-          html += f"""
-          <div class="card">
-              <strong>{proj['name']}</strong>
-              <p>{proj['description']}</p>
-              <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
-              <p><a href="https://khansaqib.com/projects/{filename}">Read More</a></p>
-          </div>
-          """
-
-    html += f"""
-</section>
-<footer>
-    &copy; 2025 {name} | <a href="{github}" target="_blank">GitHub</a> | <a href="{linkedin}" target="_blank">LinkedIn</a>
-</footer>
-</body>
-</html>
+<header><h1>{page_title}</h1></header>
+{navbar}
+<section>
 """
-    return html
 
-def generate_projects_overview(projects):
-    html = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Projects</title>
-<link rel="stylesheet" href="../assets/css/styles.css">
-</head>
-<body>
-<header><h1>Projects</h1></header>
-""" + generate_navbar() + "<section>"
+    for item in items:
+        filename = item.get('name', 'unknown').lower().replace(" ", "_") + ".html"
 
-    for proj in projects:
-        if proj.get("type") == "application":
-          filename = proj['name'].lower().replace(" ", "_") + ".html"
-          html += f"""
-          <div class="card">
-              <strong>{proj['name']}</strong>
-              <p>{proj['description']}</p>
-              <p>{proj['details']}</p>
-              <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
-          </div>
-          """
+        if item.get("type") == "application" or not is_project:
+            html += f"""
+        <div class="card">
+            <strong>{item.get('name', 'No Name')}</strong>
+            <p>{item.get('description', '')}</p>
+            <p>{item.get('details', '')}</p>
+            <p>Visit: <a href="{item.get('link', '#')}" target="_blank">{item.get('visit', 'Link')}</a></p>
+        </div>
+            """
         else:
-          filename = proj['name'].lower().replace(" ", "_") + ".html"
-          html += f"""
-          <div class="card">
-              <strong>{proj['name']}</strong>
-              <p>{proj['description']}</p>
-              <p>Visit: <a href="{proj['link']}" target="_blank">{proj['Visit']}</a></p>
-              <p><a href="https://khansaqib.com/projects/{filename}">Read More</a></p>
-          </div>
-          """
+            html += f"""
+        <div class="card">
+            <strong>{item.get('name', 'No Name')}</strong>
+            <p>{item.get('description', '')}</p>
+            <p>Visit: <a href="{item.get('link', '#')}" target="_blank">{item.get('visit', 'Link')}</a></p>
+            <p><a href="{filename}">Read More</a></p>
+        </div>
+            """
 
     html += f"""
 </section>
@@ -107,23 +73,45 @@ def main():
     # Write CSS
     write_file("assets/css/styles.css", css_content)
 
-    # Generate About Me page
-    write_file("index.html", generate_about_me_page())
+    # Generate About Me page (root)
+    write_file("index.html", generate_about_me_page(generate_navbar()))
     print("Generated index.html (About Me page)")
 
-    # Generate individual project pages
+    # Generate individual project pages (inside projects/)
     for proj in projects:
-        print(f"proj={proj}")
         if proj.get("type") == "application":
             print(f"Skipped generating page for {proj['name']} (manual file in place)")
             continue
         filename = proj['name'].lower().replace(" ", "_") + ".html"
-        write_file(f"projects/{filename}", generate_project_page(proj))
+        write_file(f"projects/{filename}", generate_project_page(proj, generate_navbar("../")))
         print(f"Generated projects/{filename}")
 
-    # Generate projects overview page
-    write_file("projects/index.html", generate_projects_overview(projects))
+    # Generate projects overview page (inside projects/)
+    write_file("projects/index.html", generate_overview(projects, "Projects Overview", is_project=True, navbar=generate_navbar("../")))
     print("Generated projects/index.html (Projects Overview page)")
+
+    
+
+
+    # Generate individual app pages (inside apps/ platform subfolders)
+    for app in apps:
+        platform_folder = app.get("platform", "").lower()
+        folder_path = f"apps/{platform_folder}/{app['name'].lower().replace(' ', '_')}" if platform_folder else f"apps/{app['name'].lower().replace(' ', '_')}"
+
+        # Ensure the folder exists
+        os.makedirs(folder_path, exist_ok=True)
+
+        # Local HTML filename
+        filename = app['name'].lower().replace(" ", "_") + ".html"
+
+        write_file(f"{folder_path}/index.html", generate_app_page(app, platform_folder=platform_folder,
+                navbar=generate_navbar("../" if platform_folder else "")))
+        print(f"Generated {folder_path}/{filename}")
+
+    # Generate apps overview page (inside apps/)
+    write_file("apps/index.html", generate_apps_overview(apps, page_title="Apps Overview", navbar=generate_navbar("../")))
+    print("Generated apps/index.html (Apps Overview page)")
 
 if __name__ == "__main__":
     main()
+

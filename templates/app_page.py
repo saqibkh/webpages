@@ -1,27 +1,54 @@
 from data.personal_info import name, github, linkedin
-from templates.navbar import generate_navbar
 
-def generate_app_page(app):
+def generate_app_page(app, platform_folder="", navbar=""):
+    """
+    Generates an individual app page.
+
+    :param app: dictionary with app info
+    :param platform_folder: subfolder under apps/ (e.g., 'android')
+    :param navbar: HTML string for the navigation bar
+    """
+    # Fallbacks for missing fields
+    app_name = app.get("name", "App")
+    short_description = app.get("short_description", "")
+    full_description = app.get("full_description", "")
+    local_link = app.get("link", "#")
+    play_store_link = app.get("play_store_link", "#")
+    platform = app.get("platform", "Unknown")
+    app_type = app.get("type", "App")
+
+    # Adjust relative paths for CSS and navbar
+    css_path = "../assets/css/styles.css" if platform_folder else "assets/css/styles.css"
+    navbar_html = navbar or ""
+
     html = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{project['name']}</title>
-<link rel="stylesheet" href="../assets/css/styles.css">
+<title>{app_name}</title>
+<link rel="stylesheet" href="{css_path}">
 </head>
 <body>
 <header>
-    <h1>{project['name']}</h1>
+    <h1>{app_name}</h1>
 </header>
 
-{generate_navbar("../")}
+{navbar_html}
 
 <section>
     <div class="card">
-        <p>{project['details']}</p>
-        <p>Visit: <a href="{project['link']}" target="_blank">{project['link']}</a></p>
+        <h2>Short Description</h2>
+        <p>{short_description}</p>
+
+        <h2>Full Description</h2>
+        <p>{full_description or 'No full description provided.'}</p>
+
+        <p><strong>Platform:</strong> {platform}</p>
+        <p><strong>Type:</strong> {app_type}</p>
+        <p><strong>Local Page:</strong> <a href="{local_link}" target="_blank">{app_name}</a></p>
+        <p><strong>Play Store:</strong> <a href="{play_store_link}" target="_blank">View on Play Store</a></p>
     </div>
 </section>
 
@@ -32,3 +59,4 @@ def generate_app_page(app):
 </html>
 """
     return html
+
