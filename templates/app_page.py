@@ -3,24 +3,23 @@ from data.personal_info import name, github, linkedin
 def generate_app_page(app, platform_folder="", navbar=""):
     """
     Generates an individual app page.
-    
+
     :param app: dictionary with app info
-    :param platform_folder: folder where the page will reside (e.g., 'android'), used to adjust relative navbar paths
+    :param platform_folder: subfolder under apps/ (e.g., 'android')
     :param navbar: HTML string for the navigation bar
     """
-    # Use empty strings as fallback if keys are missing
-    app_name = app.get('name', 'App')
-    short_description = app.get('short_description', '')
-    full_description = app.get('full_description', '')
-    link = app.get('link', '#')
-    platform = app.get('platform', 'Unknown')
-    app_type = app.get('type', 'App')
+    # Fallbacks for missing fields
+    app_name = app.get("name", "App")
+    short_description = app.get("short_description", "")
+    full_description = app.get("full_description", "")
+    local_link = app.get("link", "#")
+    play_store_link = app.get("play_store_link", "#")
+    platform = app.get("platform", "Unknown")
+    app_type = app.get("type", "App")
 
-    # Adjust relative navbar path based on platform folder
-    if platform_folder:
-        navbar_path = "../"
-    else:
-        navbar_path = ""
+    # Adjust relative paths for CSS and navbar
+    css_path = "../assets/css/styles.css" if platform_folder else "assets/css/styles.css"
+    navbar_html = navbar or ""
 
     html = f"""
 <!DOCTYPE html>
@@ -29,14 +28,14 @@ def generate_app_page(app, platform_folder="", navbar=""):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{app_name}</title>
-<link rel="stylesheet" href="{navbar_path}../assets/css/styles.css">
+<link rel="stylesheet" href="{css_path}">
 </head>
 <body>
 <header>
     <h1>{app_name}</h1>
 </header>
 
-{navbar or ''}
+{navbar_html}
 
 <section>
     <div class="card">
@@ -48,7 +47,8 @@ def generate_app_page(app, platform_folder="", navbar=""):
 
         <p><strong>Platform:</strong> {platform}</p>
         <p><strong>Type:</strong> {app_type}</p>
-        <p><strong>Visit:</strong> <a href="{link}" target="_blank">{link}</a></p>
+        <p><strong>Local Page:</strong> <a href="{local_link}" target="_blank">{app_name}</a></p>
+        <p><strong>Play Store:</strong> <a href="{play_store_link}" target="_blank">View on Play Store</a></p>
     </div>
 </section>
 

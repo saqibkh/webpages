@@ -3,6 +3,8 @@ apps = [
         "name": "WarmMeUp",
         "type": "app",
         "platform": "android",
+        "link": "android/warmmeup",
+        "play_store_link": "https://play.google.com/store/apps/details?id=com.khansaqib.android.warmmeup",
         "short_description": "Virtual handwarmer with heat simulation, vibration, and customizable themes.",
         "Full Description": """WarmMeUp – Turn Your Device into a Pocket Handwarmer!
 
@@ -41,6 +43,8 @@ WarmMeUp is your pocket companion for fun, heat simulation, and interactive visu
         "name": "Calculator",
         "type": "app",
         "platform": "android",
+        "link": "android/calculator",
+        "play_store_link": "https://play.google.com/store/apps/details?id=com.khansaqib.android.calculator",
         "short_description": "All-in-one calculator: Standard, Scientific & Programmer modes with themes.",
         "Full Description": """Calculator – Standard, Scientific & Programmer
 
@@ -75,6 +79,8 @@ Download now and enjoy a fast, reliable, and beautiful calculator on your device
         "name": "Dummy",
         "type": "app",
         "platform": "android",
+        "link": "android/dummy",
+        "play_store_link": "https://play.google.com/store/apps/details?id=com.khansaqib.android.dummy",
         "short_description": "",
         "Full Description": """"""
     },
