@@ -1,8 +1,11 @@
 from data.personal_info import name, github, linkedin, email, location, photo, bio, education, skills, hobbies
 from data.experience_data import experience
-from templates.navbar import generate_navbar
 
-def generate_about_me_page():
+def generate_about_me_page(navbar=""):
+    """
+    Generates the About Me page HTML.
+    :param navbar: HTML string for the navigation bar (with correct relative paths)
+    """
     # Education HTML
     education_html = ''.join([f"<li><strong>{e['degree']}</strong>, {e['school']} ({e['year']})</li>" for e in education])
 
@@ -41,7 +44,7 @@ def generate_about_me_page():
     <p><a href="{github}" target="_blank">GitHub</a> | <a href="{linkedin}" target="_blank">LinkedIn</a></p>
 </header>
 
-{generate_navbar()}
+{navbar}
 
 <section>
     <h2>About Me</h2>
@@ -82,3 +85,4 @@ def generate_about_me_page():
 </html>
 """
     return html
+

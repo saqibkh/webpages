@@ -7,12 +7,13 @@ from data.personal_info import name, github, linkedin
 from data.projects_data import projects
 from data.apps_data import apps
 
-def generate_overview(items, page_title, is_project=True):
+def generate_overview(items, page_title, is_project=True, navbar=""):
     """
     Generic overview page generator.
     items: list of dictionaries (projects or apps)
     page_title: string, page heading
     is_project: if True, assume it's projects; otherwise, apps
+    navbar: HTML string for the navigation bar
     """
     html = f"""
 <!DOCTYPE html>
@@ -25,7 +26,9 @@ def generate_overview(items, page_title, is_project=True):
 </head>
 <body>
 <header><h1>{page_title}</h1></header>
-""" + generate_navbar() + "<section>"
+{navbar}
+<section>
+"""
 
     for item in items:
         filename = item.get('name', 'unknown').lower().replace(" ", "_") + ".html"
@@ -59,7 +62,6 @@ def generate_overview(items, page_title, is_project=True):
 """
     return html
 
-
 def main():
     # Setup directories
     setup_directories()
@@ -67,27 +69,26 @@ def main():
     # Write CSS
     write_file("assets/css/styles.css", css_content)
 
-    # Generate About Me page
-    write_file("index.html", generate_about_me_page())
+    # Generate About Me page (root)
+    write_file("index.html", generate_about_me_page(generate_navbar()))
     print("Generated index.html (About Me page)")
 
-    # Generate individual project pages
+    # Generate individual project pages (inside projects/)
     for proj in projects:
         if proj.get("type") == "application":
             print(f"Skipped generating page for {proj['name']} (manual file in place)")
             continue
         filename = proj['name'].lower().replace(" ", "_") + ".html"
-        write_file(f"projects/{filename}", generate_project_page(proj))
+        write_file(f"projects/{filename}", generate_project_page(proj, generate_navbar("../")))
         print(f"Generated projects/{filename}")
 
-    # Generate projects overview page
-    write_file("projects/index.html", generate_overview(projects, "Projects Overview", is_project=True))
+    # Generate projects overview page (inside projects/)
+    write_file("projects/index.html", generate_overview(projects, "Projects Overview", is_project=True, navbar=generate_navbar("../")))
     print("Generated projects/index.html (Projects Overview page)")
 
-    # Generate apps overview page
-    write_file("apps/index.html", generate_overview(apps, "Apps Overview", is_project=False))
+    # Generate apps overview page (inside apps/)
+    write_file("apps/index.html", generate_overview(apps, "Apps Overview", is_project=False, navbar=generate_navbar("../")))
     print("Generated apps/index.html (Apps Overview page)")
-
 
 if __name__ == "__main__":
     main()
