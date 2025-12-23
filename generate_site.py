@@ -1,7 +1,10 @@
+import os
+import sys
 from utils.file_utils import setup_directories, write_file
 from utils.css_template import css_content
 from templates.about_page import generate_about_me_page
 from templates.project_page import generate_project_page
+from templates.app_page import generate_app_page
 from templates.navbar import generate_navbar
 from data.personal_info import name, github, linkedin
 from data.projects_data import projects
@@ -86,8 +89,25 @@ def main():
     write_file("projects/index.html", generate_overview(projects, "Projects Overview", is_project=True, navbar=generate_navbar("../")))
     print("Generated projects/index.html (Projects Overview page)")
 
+    
+
+
+    # Generate individual app pages (inside apps/ platform subfolders)
+    for app in apps:
+        platform_folder = app.get("platform", "").lower()
+        if platform_folder:
+            folder_path = f"apps/{platform_folder}"
+        else:
+            folder_path = "apps"
+
+        os.makedirs(folder_path, exist_ok=True)
+        filename = app['name'].lower().replace(" ", "_") + ".html"
+        write_file(f"{folder_path}/{filename}", generate_app_page(app, platform_folder=platform_folder,
+                navbar=generate_navbar("../" if platform_folder else "")))
+        print(f"Generated {folder_path}/{filename}")
+
     # Generate apps overview page (inside apps/)
-    write_file("apps/index.html", generate_overview(apps, "Apps Overview", is_project=False, navbar=generate_navbar("../")))
+    write_file("apps/index.html", generate_overview(apps,"Apps Overview", is_project=False,navbar=generate_navbar("../")))
     print("Generated apps/index.html (Apps Overview page)")
 
 if __name__ == "__main__":
