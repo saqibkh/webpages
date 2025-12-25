@@ -76,6 +76,14 @@ Whether you’re doing simple arithmetic, advanced scientific calculations, or p
 Download now and enjoy a fast, reliable, and beautiful calculator on your device!"""
     },
     {
+        "name": "SoundCanvas",
+        "type": "app",
+        "platform": "android",
+        "link": "android/soundcanvas",                                                                        "play_store_link": "https://play.google.com/store/apps/details?id=com.khansaqib.android.soundcanvas",
+        "short_description": "",
+        "Full Description": """"""
+    },
+    {
         "name": "Dummy",
         "type": "app",
         "platform": "android",
